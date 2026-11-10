@@ -126,7 +126,7 @@ Found a job somewhere the pipeline doesn't watch? Paste it into `inbox.md` (the 
 
 Built by Matthew Wilson ([LinkedIn](https://www.linkedin.com/in/matthewwoodwilson))
 
-I built it to show how to design reliable agent workflows: guardrails, evals and tests, not just prompts.
+I built it because I believe there should still be integrity in the job search process amidst the onslaught of agentic AI.
 
 ## License
 
