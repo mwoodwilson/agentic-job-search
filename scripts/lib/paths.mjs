@@ -23,6 +23,7 @@ export const HEALTH_FILE = at("data", "health.json");
 export const PULLED_FILE = at("data", "boards-pulled.json"); // boards read at least once (lib/first-pull.mjs)
 export const LOCK_FILE = at("data", "job-pull.lock");
 export const CHECKS_DIR = at("data", "checks");
+export const DRAFTS_DIR = at("data", "drafts"); // each role's draft while it is written and checked (lib/tailor-loop.mjs)
 export const PROPOSALS_DIR = at("data", "proposals");
 export const SCOUT_FILE = at("data", "scout.json");
 export const WORKFLOW_LOG = at("data", "workflow-log.md");

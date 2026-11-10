@@ -6,11 +6,11 @@ An hourly job-search pipeline for Mac and Claude Code. It watches the job boards
 
 ## What it does
 
-1. Every hour it reads the public job boards of the companies you choose and keeps the new roles that match your titles, places and pay.
-2. It adds them to a job list (and, if you like, a Numbers sheet) and saves each full job description.
-3. A writer agent drafts a one-page resume for each role, using only the facts in your own files.
+1. Every hour it reads the public job boards of the companies you choose, all at once, and keeps the new roles that match your titles, places and pay.
+2. It adds them to a job list (and, if you like, a Numbers sheet), saves each full job description, and, if you turned text or email on, tells you right away how many roles were added.
+3. A writer agent drafts a one-page resume for each role, up to 3 at a time, using only the facts in your own files.
 4. Code checks five of the six hard rules. A separate fact-checker agent must then back every line with a quote from your files, and code confirms each quote is really there (hard rule 5). After up to three tries, a resume that still fails is held for you.
-5. Resumes that pass become Word and PDF files. Text, email and Numbers notifications are all off until you turn them on.
+5. Each resume that passes becomes Word and PDF files and is sent the moment it's ready, in its own text and email with the job link. Text, email and Numbers notifications are all off until you turn them on. A run with one new role takes a few minutes.
 
 ## How it works
 
@@ -19,7 +19,7 @@ flowchart TD
     pull["Hourly pull<br/>public company job boards"] --> filters["Filters<br/>title, place, pay"]
     filters --> list["Job list and archives<br/>data/jobs.csv, archives/"]
     inbox["Optional inbox<br/>inbox.md, from you or another agent"] --> list
-    list --> writer["Writer agent<br/>tailor-resume"]
+    list --> writer["Writer agent<br/>tailor-resume, up to 3 roles at once"]
     writer --> code["Code checks<br/>5 of the 6 hard rules"]
     writer -->|"under 70% true keyword match"| could["Could not tailor<br/>nothing is stretched"]
     code -->|"rules pass"| checker["Fact-checker agent<br/>a separate Claude run"]
@@ -29,7 +29,8 @@ flowchart TD
     tries -->|"yes, revise"| writer
     tries -->|"no"| review["Needs review<br/>held for you, with reasons"]
     quotes -->|"every line supported"| files["Resume ready<br/>Word + PDF, one page"]
-    files --> notify["Notifications, if on<br/>text, email, Numbers sheet"]
+    files --> notify["Notifications, if on<br/>sent as soon as it passes, with the job link"]
+    list -.->|"new roles, right away"| sheet["Notifications, if on<br/>new-roles line, Numbers sheet"]
 
     pull -.->|"a board breaks 3 runs in a row"| repair["Repair agent<br/>diagnose-board"]
     scout["Scout agent, weekly<br/>scout-companies"] -.-> proposals["Proposals only<br/>data/proposals/"]
@@ -40,7 +41,7 @@ flowchart TD
     classDef good fill:#dcfce7,stroke:#16a34a,color:#111
     classDef held fill:#fef3c7,stroke:#d97706,color:#111
     class writer,checker,repair,scout agent
-    class pull,filters,list,inbox,code,quotes,tries,notify,proposals plain
+    class pull,filters,list,inbox,code,quotes,tries,notify,sheet,proposals plain
     class files good
     class could,review held
 ```
@@ -55,10 +56,10 @@ Read next: [Setup](docs/SETUP.md), [Architecture](docs/ARCHITECTURE.md), [Custom
 - **The rules are enforced in code.** Summary length, bullet length, a number in every bullet, time-bound results and keyword coverage are measured by code, not asked for in a prompt. If you edit the hard-rules block in `profile/resume-rules.md`, it is put back at the next run. Your own rules can add to the hard rules but never loosen them.
 - **Quotes are verified by code.** For each line, the fact-checker must quote the exact line from your files that backs it. Code confirms the quote is really in `profile/profile.md`, `profile/stories.md` or a resume you finalized. A resume is never its own source, and an invented quote fails.
 - **Agents that only propose.** The repair agent and the scout can write one proposal file each. They never change your settings, your data or the code.
-- **Limited file access and dollar caps.** Every Claude step runs by itself. It can read files only inside the project folder and write only the one or two files it is named for, and it can't run shell commands. Only the repair agent (which can also open web pages) and the scout (which can also search the web and open pages) reach the internet. Each step has a dollar cap and a 20-minute time limit, and if the writer edits any other resume, that edit is undone.
+- **Limited file access and dollar caps.** Every Claude step runs by itself. It can read files only inside the project folder and write only the one or two files it is named for, and it can't run shell commands. Only the repair agent (which can also open web pages) and the scout (which can also search the web and open pages) reach the internet. Each step has a dollar cap and a 20-minute time limit, and the writer can write only its own role's draft, never another resume.
 - **Evals that grow from real failures.** The fact-checker is tested on a true resume and on copies with one planted problem each: a changed number, inflated ownership, work moved to the wrong role, a summary that is a list of keywords. Every real failure becomes a new case before it is fixed. How it works and what each case caught: [docs/EVALS.md](docs/EVALS.md).
 - **Nothing is sent twice.** A log of what was sent, kept per resume version, means a rerun or a crash never sends the same resume twice, while a changed resume does go out again. Only one run happens at a time, and every run is saved to a local history you can undo.
-- **Tests.** 417 automatic tests (`node --test`) cover the checks, the writer loop, the messages and the settings. They use only the made-up example person and make no Claude calls.
+- **Tests.** 445 automatic tests (`node --test`) cover the checks, the writer loop, the messages and the settings. They use only the made-up example person and make no Claude calls.
 
 ## Quick start
 
@@ -84,7 +85,7 @@ Everyday commands:
 |---|---|
 | `node scripts/check-setup.mjs` | Checks Node, Claude Code, your settings and your profile, and names anything still open |
 | `node scripts/job-pull.mjs` | One full run, the same one the hourly job makes |
-| `node scripts/job-pull.mjs --no-ai` | Only pulls and lists roles; no Claude calls. New roles keep the Status `New`, so the next full run writes (and pays for) a resume for each one. A company's first pull still lands as `Backlog`, even with `--no-ai`. With text or email on, a run that adds roles sends "Job search: N new roles added, no resumes created." (that includes a first pull's `Backlog` roles) |
+| `node scripts/job-pull.mjs --no-ai` | Only pulls and lists roles; no Claude calls. New roles keep the Status `New`, so the next full run writes (and pays for) a resume for each one. A company's first pull still lands as `Backlog`, even with `--no-ai`. With text or email on, a run that adds roles sends "Job search: N new roles added." (that includes a first pull's `Backlog` roles) |
 | `node scripts/job-pull.mjs --no-ai --backlog` | Pulls and lists every new role as `Backlog`: no resumes, no messages, no Claude calls. Set a role's Status to `New` to get a resume for it |
 | `node scripts/install-schedule.mjs` | Turns the hourly job on or off to match `schedule.hourly` in your settings |
 | `node --test` | The automatic tests |
@@ -97,7 +98,7 @@ Your own files stay on your Mac. Your settings (`config/preferences.json`), your
 The code is free, and a quiet hour makes no Claude calls, so the cost is the Claude usage for the work that does happen. The first time a company's board is read, the roles already open there are listed as `Backlog`, with no resumes, so adding a company never starts a pile of paid resumes at once. Only roles that appear after that get resumes by themselves.
 
 - A full resume, with the writer, the fact-checker and any retries, typically costs about $2 to $4 (one measured run: $2.92 over three tries; runs have ranged from about $1 to $5). It depends on your default Claude model and on how many tries a resume needs, and retries can go up to the per-step caps below.
-- A run that adds postings to an archive also updates that role family's competencies file, which is one more Claude step.
+- Once a day, the first run after new postings were archived also updates those role families' competencies files, which is one more Claude step.
 - Each Claude step is capped by `claude.maxUsdPerStep` (default $3). A step stops when it reaches its cap.
 - The weekly scout is off by default. A run costs about $5 and is capped by `claude.maxUsdScout`.
 - The fact-checker evals measured $1.31 for their 5 cases.

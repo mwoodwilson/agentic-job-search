@@ -13,7 +13,7 @@ test("every Claude step writes only to named files, through full-path editRule()
   assert.deepEqual(literal, [], "write/shell rules must come from editRule()");
   const targets = [...all.matchAll(/editRule\(([^)]*)\)/g)].map((m) => m[1].trim());
   assert.ok(targets.length >= 6, `found ${targets.length}`);
-  for (const x of targets) assert.match(x, /^("outputs\/tailored-resumes\.md"|"archives\/competencies-\*\.md"|"inbox\.md"|"data\/inbox-import\.json"|checkPath|proposal)$/, `unexpected write target: ${x}`);
+  for (const x of targets) assert.match(x, /^("outputs\/tailored-resumes\.md"|"archives\/competencies-\*\.md"|"inbox\.md"|"data\/inbox-import\.json"|checkPath|draft|proposal)$/, `unexpected write target: ${x}`);
   assert.doesNotMatch(src("lib/agents.mjs"), /"Bash"/);
 });
 

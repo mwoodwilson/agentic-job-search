@@ -1,6 +1,6 @@
 ---
 name: check-resume
-description: Fact-checks one tailored resume in outputs/tailored-resumes.md against the user's own files and writes a JSON verdict for every summary sentence and bullet, with the exact source line that backs it. Runs automatically after tailor-resume writes or revises a resume. Use when asked to fact-check a resume. Never edits the resume.
+description: Fact-checks one tailored resume (the role's draft in data/drafts/, or one in outputs/tailored-resumes.md) against the user's own files and writes a JSON verdict for every summary sentence and bullet, with the exact source line that backs it. Runs automatically after tailor-resume writes or revises a resume. Use when asked to fact-check a resume. Never edits the resume.
 ---
 
 # Check resume
@@ -26,7 +26,7 @@ Flag a line only when a **fact** changes: what the user did, which job it was in
 - The role's link, a list of keywords to confirm, and the output path for your JSON (`data/checks/<hash>.json`).
 
 ## Steps
-1. **Find the resume.** Grep the link in the file the prompt names (normally `outputs/tailored-resumes.md`; test cases name a fixture file); read that section from its `## ` heading to the next `---`.
+1. **Find the resume.** It's in the file the prompt names: the role's draft (`data/drafts/<id>.md`) in the automatic runs, `outputs/tailored-resumes.md` for a check by hand, or a fixture file in test cases. Grep the link there and read that section from its `## ` heading to the next `---`. When the prompt includes the resume or a source file between `<file path="…">` tags, use that text as given and don't open the file again.
 2. **Read the sources.** These three are the only valid `source_file` values, written exactly like this:
    - `profile/profile.md` (including each role's "Confirmed facts")
    - `profile/stories.md`

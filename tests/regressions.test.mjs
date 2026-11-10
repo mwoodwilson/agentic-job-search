@@ -30,15 +30,16 @@ test("a skill name never splits across lines (non-breaking spaces inside each sk
 });
 
 test("a failed file build holds the role and alerts; a resume with no file is skipped, not a crash", () => {
-  const catchBlock = src.slice(src.indexOf("Couldn't build resume files for"), src.indexOf("return { docs: out, review };"));
-  assert.match(catchBlock, /safeStatus\(s\.url, "Needs review"\)/);
-  assert.match(catchBlock, /review\.push/);
-  assert.match(src, /if \(!src\) return null;/, "the text skips a resume with no file");
-  assert.match(src, /unsent\(resumeDocs, "resume-email", \{ version, file: sentFile \}\)\.filter\(\(r\) => r\.pdf \|\| r\.docx\)/, "so does the email");
+  const build = src.slice(src.indexOf("async function buildResume("), src.indexOf("\n}\n", src.indexOf("async function buildResume(")));
+  assert.match(build, /const held = \(problems\) => \{\s*safeStatus\(link, "Needs review"\);\s*logEvent\("failure"/);
+  assert.match(build, /return \{ review: \{ link, title: name, problems \} \}/);
+  assert.match(build, /catch \(e\) \{[\s\S]*return held\(\[`The Word\/PDF build failed: \$\{e\.message\}`\]\)/);
+  const send = src.slice(src.indexOf("async function notifyResume("), src.indexOf("\n}\n", src.indexOf("async function notifyResume(")));
+  assert.match(send, /const src = r\.pdf \|\| r\.docx;\s*if \(!src \|\| !\(texting \|\| emailing\)\) return \{ sent: false \};/, "a resume with no file is sent on neither channel");
 });
 
 test("the trim prompt names the resume by its link; the role-guide restore writes atomically", () => {
-  assert.match(src, /the resume whose Link line is \$\{s\.url\}/);
+  assert.match(src, /The resume in \$\{draft\} \(Link: \$\{link\}/);
   const restore = src.slice(src.indexOf("async function restoreRoleGuides"), src.indexOf("async function restoreRoleGuides") + 600);
   assert.match(restore, /writeAtomic\(/);
   assert.doesNotMatch(restore, /await writeFile\(/);
@@ -58,7 +59,7 @@ test("--retailor: a role with an old and a new resume builds and sends only the 
     { url: "https://a", short: true, markdown: "short A" },
   ];
   assert.deepEqual(newestPerLink(secs).map((s) => s.markdown), ["new A", "B", "short A"]);
-  assert.match(src, /newestPerLink\(await tailoredSections\(\)\)\.filter\(\(x\) => links\.includes\(x\.url\) && !x\.short\)/);
+  assert.match(src, /newestPerLink\(await tailoredSections\(\)\)\.find\(\(x\) => x\.url === link && !x\.short\)/);
 });
 
 test("an Ashby board name with spaces is encoded once, not twice (%20, never %2520)", () => {

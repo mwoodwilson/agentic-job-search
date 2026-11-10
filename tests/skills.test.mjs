@@ -47,7 +47,7 @@ const KNOWN = [
   "config/preferences.json", // SETTINGS_FILE, unless AJS_SETTINGS points it elsewhere
   rel(P.archiveFile(FAMILY)).replace(FAMILY, "*"),
   rel(P.competenciesFile(FAMILY)).replace(FAMILY, "*"),
-  `${rel(P.CHECKS_DIR)}/*`, `${rel(P.PROPOSALS_DIR)}/*`, `${rel(P.OUT_DIR)}/*`, // files the scripts name themselves
+  `${rel(P.CHECKS_DIR)}/*`, `${rel(P.DRAFTS_DIR)}/*`, `${rel(P.PROPOSALS_DIR)}/*`, `${rel(P.OUT_DIR)}/*`, // files the scripts name themselves
   ...gitignored,
   ...walk(P.ROOT),
 ];

@@ -9,6 +9,10 @@ Runs automatically after each job pull, **one role per run**: the script names t
 
 After you save, the script checks your resume in code (the six hard rules, format, counts, banned wording, keyword coverage) and a separate fact-checker (the check-resume skill) checks every claim against the user's files. If either finds problems, you are run again in **revision mode** with the list: fix only those lines in the existing section, keep everything else, and update the Keywords line, coverage count and Sources line to match. Never add a second section for the same link.
 
+**Draft file.** In the automatic runs the prompt names the role's draft file (`data/drafts/<id>.md`). Save the resume there as the file's only section, and revise it there; never edit `outputs/tailored-resumes.md`. The script files the resume in `outputs/tailored-resumes.md` after the checks (up to 3 roles are written at once, each in its own draft).
+
+**Files in the prompt.** When the prompt includes a file's contents between `<file path="…">` tags, use them as given and don't open that file again. Read any other file you need as usual.
+
 ## Files (paths are from the project folder)
 - `data/jobs.csv`: the running list of roles. Status is the second cell and Link the last. Roles waiting for a resume have Status "New".
 - `archives/jobs-<family-slug>.md`: the job description archives, one per role family (`search.families` in `config/preferences.json`; the slug is the family name in lowercase with dashes, so "Product Manager" is `archives/jobs-product-manager.md`). Each role is a section starting `## <Title> | <Company>`, with a `**Link:**` line matching the Link column in data/jobs.csv. Find a role by grepping its link across `archives/jobs-*.md`, then read from its `##` heading to the next `---`. Never read a whole archive.
@@ -33,6 +37,15 @@ After you save, the script checks your resume in code (the six hard rules, forma
 - **Bullet counts:** follow each role's `minBullets` in `resume.roles` and `resume.maxBullets` when they are set; the code checks them. Otherwise give the most recent role 4–5 bullets and older roles 2–3. The most recent roles get the strongest bullets.
 - **One page, 200 characters per bullet at most (hard rule 2).** Keep the whole resume to one page with fewer bullets, never longer ones. If a resume still runs long, the script asks you to drop the least relevant bullet.
 
+## Get it right on the first draft
+Every revision is another paid round of writing and checking. These are the problems that most often send drafts back:
+- **Aim for 180 characters or fewer per bullet.** 200 is the hard limit, and bullets that fail it usually land just over (201–206): write with room to spare.
+- **Every summary sentence says what the user did or does.** Never stack the job's keywords in one sentence ("qualitative insights, quantitative analysis, ambiguity, tradeoffs…"). The fact-checker rejects a sentence that reads as a keyword list.
+- **Avoid the fact-checker's common stretches.** The prompt includes them (from `.claude/skills/check-resume/SKILL.md`); a line that matches one is always sent back.
+- **Use every number with exactly the scope its source gives:** what it counts, which work, which period. A total across several launches is never the result of one launch, and a count of two groups combined is never the count of one.
+- **Claim only teams, places and results the files name.** Don't add partners, surfaces or audiences that the source doesn't state.
+- **Fill in the coverage count by counting the ✓ marks** in the Keywords line.
+
 ## Steps
 Pick the role: the one named in the prompt (by link) or by the user. If profile/profile.md has no experience yet, say "profile/profile.md has no experience yet, so no resumes were tailored." and stop. Then:
 
@@ -46,10 +59,10 @@ Pick the role: the one named in the prompt (by link) or by the user. If profile/
    - **Skills:** 8–12 items from profile.md's skills that this job asks for, in `a | b | c` format.
    - **Education:** the "On resumes" line in profile.md's Education section.
 5. **Polish pass (required before scoring).** First check every line against the six hard rules and fix any line that breaks one. Then read it against "My rules" in profile/resume-rules.md and apply the ones that fit this role. Then check that every skill, keyword and competency the resume emphasizes traces to this job's description; cut or rephrase any that only the competencies file suggested. Then read every line as the hiring manager for this role would. Rewrite any line that echoes the notes' wording, reads casual or vague, or doesn't make the impact obvious in one read. Each bullet must lead with a strong verb, state the scope or challenge, and land the result.
-6. **Score.** Coverage = keywords that appear in the new resume ÷ total keywords. A keyword counts if the job's wording, or a standard variant ("A/B test" / "A/B testing"), appears.
+6. **Score.** Coverage = keywords that appear in the new resume ÷ total keywords (count the ✓ marks for the coverage line). A keyword counts if the job's wording, or a standard variant ("A/B test" / "A/B testing"), appears.
    - **70% or more:** save it (step 7).
    - **Under 70%:** respond `Could not tailor resume without lying.` with the coverage reached and the missing keywords. Save no resume.
-7. **Save.** Add a new section to outputs/tailored-resumes.md directly below the file's intro text (newest first). Never overwrite an earlier resume, and change nothing outside this role's section (an edit to any other resume is undone):
+7. **Save.** When the prompt names a draft file, save the section below as that file's only content (the script files it in outputs/tailored-resumes.md). Otherwise (a run by hand), add a new section to outputs/tailored-resumes.md directly below the file's intro text (newest first). Never overwrite an earlier resume, and change nothing outside this role's section:
    ```
    ---
 

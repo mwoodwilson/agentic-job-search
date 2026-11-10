@@ -45,6 +45,7 @@ The last case matters because facts alone can't catch it: every word is true, bu
 |---|---|---|
 | First full run | 5 of 5 | $1.31 |
 | After the final review's fixes | 5 of 5 | $1.26 |
+| After the speed changes (drafts, files in the prompt) | 5 of 5 | $1.26 |
 
 A full run costs about $1.30 in Claude usage. One case costs about $0.25.
 

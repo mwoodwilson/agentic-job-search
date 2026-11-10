@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ROOT } from "../scripts/lib/paths.mjs";
 import { withDefaults } from "../scripts/lib/settings.mjs";
-import { tailorRole, tailorRoles, checkPathFor } from "../scripts/lib/tailor-loop.mjs";
+import { tailorRole, tailorRoles, checkPathFor, draftPathFor, mergeSection, sectionFor } from "../scripts/lib/tailor-loop.mjs";
 import { editRule } from "../scripts/lib/claude.mjs";
 import { parseSection, checkResume, summarySentences } from "../scripts/lib/check-resume.mjs";
 import { readSources } from "../scripts/job-pull.mjs";
@@ -22,21 +22,26 @@ const sources = { "profile/profile.md": bullets.join("\n") }; // every bullet ha
 const confirmAll = checkResume(jordan, { rules }).softMisses.map((k) => ({ keyword: k, found: true, resume_quote: bullets[0].slice(0, 12) }));
 const allSupported = { bullets: bullets.map((b) => ({ text: b, verdict: "supported", source_file: "profile/profile.md", source_quote: b.slice(0, 40) })), keywords: confirmAll };
 
-// A fake world: the writer saves `resume` on each try; the checker returns checks[try].
+// A fake world: the writer saves `resume` to the role's draft file on each try; the checker returns checks[try].
+// Each role has its own draft, so up to 3 writers can run at once; the script files a finished draft in
+// outputs/tailored-resumes.md.
 function world({ resumes, checks, writerSays = "RESULT: saved" }) {
   const calls = [];
-  let tailored = "# Tailored resumes\n", tries = 0, checkTries = 0, lastCheck = null;
+  let tailored = "# Tailored resumes\n", draft = "", tries = 0, checkTries = 0, lastCheck = null;
   return {
     calls,
+    set tailored(t) { tailored = t; },
     deps: {
       claude: (step, prompt, writes) => {
         calls.push({ step, prompt, writes });
         if (/check-resume/.test(prompt)) { lastCheck = checks[Math.min(checkTries++, checks.length - 1)]; return { ok: true, result: "" }; }
         const r = resumes[Math.min(tries++, resumes.length - 1)];
-        if (r) tailored = "# Tailored resumes\n\n---\n\n" + r;
+        if (r) draft = r;
         return { ok: true, result: writerSays };
       },
       readTailored: () => tailored,
+      readDraft: () => draft,
+      writeDraft: (_link, t) => { draft = t; },
       readSources: () => sources,
       readCheck: () => lastCheck,
       rules,
@@ -48,7 +53,8 @@ test("a resume that passes code checks and the fact-check is ready after one try
   const w = world({ resumes: [jordan], checks: [allSupported] });
   const r = await tailorRole(ROLE, w.deps);
   assert.deepEqual([r.status, r.tries], ["Resume ready", 1]);
-  assert.ok(w.calls[0].writes.includes(editRule("outputs/tailored-resumes.md")));
+  assert.deepEqual(w.calls[0].writes, [editRule(draftPathFor(link))], "the writer may write only its own draft");
+  assert.equal(r.section.trim(), jordan.trim(), "the passing resume is returned for the script to file");
   assert.ok(!w.calls.some((c) => c.writes.some((x) => /jobs\.csv/.test(x))), "no Claude step may write jobs.csv");
 });
 
@@ -96,7 +102,15 @@ test("an honest 'could not tailor' with no resume saved is final", async () => {
 
 test("a resume already saved by a crashed run is checked, not written again", async () => {
   const w = world({ resumes: [jordan], checks: [allSupported] });
-  w.deps.readTailored = () => "# Tailored resumes\n\n---\n\n" + jordan;
+  w.tailored = "# Tailored resumes\n\n---\n\n" + jordan;
+  const r = await tailorRole(ROLE, w.deps);
+  assert.equal(r.status, "Resume ready");
+  assert.equal(w.calls.filter((c) => /tailor-resume/.test(c.prompt)).length, 0);
+});
+
+test("a draft left by a crashed run is checked, not written again", async () => {
+  const w = world({ resumes: [jordan], checks: [allSupported] });
+  w.deps.writeDraft(link, jordan);
   const r = await tailorRole(ROLE, w.deps);
   assert.equal(r.status, "Resume ready");
   assert.equal(w.calls.filter((c) => /tailor-resume/.test(c.prompt)).length, 0);
@@ -127,28 +141,12 @@ test("the fact-check may write only its own JSON, through an Edit rule (Claude C
   assert.deepEqual(check.writes, [editRule(checkPathFor(link))]);
 });
 
-test("a writer that changes another resume in the file has its edit undone", async () => {
-  const other = "## Other | Co (2026-11-01)\nLink: https://other.example/9 · Keyword coverage: 1/1 (100%)\n";
-  const w = world({ resumes: [jordan], checks: [allSupported] });
-  let file = "# Tailored resumes\n\n---\n\n" + other;
-  const writes = [];
-  w.deps.readTailored = () => file;
-  w.deps.writeTailored = (t) => { writes.push(t); file = t; };
-  const realClaude = w.deps.claude;
-  let first = true;
-  w.deps.claude = (step, prompt, wr) => {
-    const r = realClaude(step, prompt, wr);
-    if (/tailor-resume/.test(prompt)) {
-      file = file.replace(other, other.replace("Link:", "Final: blessed by the writer\nLink:")) + "\n---\n\n" + jordan;
-      if (!first) file = file.replace("Final: blessed by the writer\n", "");
-      first = false;
-    }
-    return r;
-  };
-  const r = await tailorRole(ROLE, w.deps);
-  assert.ok(writes.length >= 1, "the file was restored");
-  assert.doesNotMatch(writes[0], /blessed by the writer/);
-  assert.notEqual(r.status, undefined);
+test("the writer's only write permission is its own draft, never outputs/tailored-resumes.md", async () => {
+  const w = world({ resumes: [jordan, jordan], checks: [{ ...allSupported, keywords: [] }, allSupported] });
+  await tailorRole(ROLE, w.deps);
+  const writers = w.calls.filter((c) => /tailor-resume/.test(c.prompt));
+  assert.ok(writers.length >= 1);
+  for (const c of writers) assert.deepEqual(c.writes, [editRule(draftPathFor(link))]);
 });
 
 test("when code checks fail, the fact-check is skipped and the writer revises first", async () => {
@@ -186,31 +184,69 @@ test("a writer run that reports an error but did save the resume still gets chec
 
 test("--retailor: a role that already has a resume gets a fresh one written (the old one stays as history)", async () => {
   const old = jordan.replace("## ", "## OLD ");
-  const w = world({ resumes: [], checks: [allSupported] });
-  let tailored = "# Tailored resumes\n\n---\n\n" + old;
-  w.deps.readTailored = () => tailored;
-  const claude = w.deps.claude;
-  w.deps.claude = (step, prompt, writes) => {
-    if (/tailor-resume/.test(prompt)) { w.calls.push({ step, prompt, writes }); tailored = "# Tailored resumes\n\n---\n\n" + jordan + "\n---\n\n" + old; return { ok: true, result: "RESULT: saved" }; }
-    return claude(step, prompt, writes);
-  };
+  const w = world({ resumes: [jordan], checks: [allSupported] });
+  w.tailored = "# Tailored resumes\n\n---\n\n" + old;
   const r = await tailorRole({ ...ROLE, fresh: true }, w.deps);
   assert.equal(r.status, "Resume ready");
   const writes = w.calls.filter((c) => /tailor-resume/.test(c.prompt));
   assert.equal(writes.length, 1);
   assert.match(writes[0].prompt, /on the role with this link only/);
   assert.doesNotMatch(writes[0].prompt, /revise/i);
-  assert.match(tailored, /## OLD /, "the earlier resume is kept");
+  assert.doesNotMatch(r.section, /## OLD /, "the new resume, not the old one");
 });
 
 test("--retailor: if no new resume is saved, the old one is never passed off as ready", async () => {
   const w = world({ resumes: [], checks: [allSupported] });
-  const tailored = "# Tailored resumes\n\n---\n\n" + jordan;
-  w.deps.readTailored = () => tailored;
+  w.tailored = "# Tailored resumes\n\n---\n\n" + jordan;
   const r = await tailorRole({ ...ROLE, fresh: true }, w.deps);
   assert.equal(r.status, "Needs review");
-  assert.ok(r.problems.some((p) => /No new resume/.test(p)));
+  assert.ok(r.problems.some((p) => /No resume with this link was saved/.test(p)));
   assert.equal(w.calls.filter((c) => /check-resume/.test(c.prompt)).length, 0, "the old resume isn't fact-checked as if it were new");
+});
+
+test("the files the writer and checker need are passed in the prompt up front", async () => {
+  const w = world({ resumes: [jordan], checks: [allSupported] });
+  w.deps.writerFiles = () => '<file path="profile/profile.md">PROFILE TEXT</file>';
+  w.deps.checkerFiles = (_link, sec) => `<file path="profile/profile.md">PROFILE TEXT</file>\n<file path="draft">${sec.slice(0, 30)}</file>`;
+  await tailorRole(ROLE, w.deps);
+  const writer = w.calls.find((c) => /tailor-resume/.test(c.prompt)).prompt;
+  const checker = w.calls.find((c) => /check-resume/.test(c.prompt)).prompt;
+  assert.ok(writer.startsWith("<file"), "files first, so runs share a cached prefix");
+  assert.match(writer, /PROFILE TEXT/);
+  assert.match(checker, /PROFILE TEXT/);
+  assert.ok(checker.includes(jordan.trim().slice(0, 30)), "the checker gets the resume itself");
+});
+
+// Where a finished draft goes in outputs/tailored-resumes.md: newest first, right under the intro.
+const intro = "# Tailored resumes\n\nIntro text.\n";
+const otherSec = "## Other | Co (2026-11-01)\nLink: https://other.example/9 · Keyword coverage: 1/1 (100%)\n";
+test("a new resume is filed at the top, under the intro, and nothing else changes", () => {
+  const out = mergeSection(intro + "\n---\n\n" + otherSec, jordan, { link });
+  assert.ok(out.startsWith(intro));
+  assert.ok(out.indexOf(link) < out.indexOf("https://other.example/9"), "newest first");
+  assert.ok(out.includes(otherSec.trim()));
+  assert.equal(sectionFor(link, out).trim(), jordan.trim());
+});
+
+test("a resume rechecked after a crash replaces its old copy instead of being filed twice", () => {
+  const edited = jordan.replace("across 120 clinics", "across 121 clinics");
+  assert.notEqual(edited, jordan);
+  const out = mergeSection(intro + "\n---\n\n" + otherSec + "\n---\n\n" + jordan, edited, { link });
+  assert.equal(out.split(link).length - 1, 1);
+  assert.match(sectionFor(link, out), /across 121 clinics/);
+});
+
+test("--retailor files the new resume on top and keeps the old one as history", () => {
+  const old = jordan.replace("## ", "## OLD ");
+  const out = mergeSection(intro + "\n---\n\n" + old, jordan, { link, fresh: true });
+  assert.equal(out.split(link).length - 1, 2);
+  assert.doesNotMatch(sectionFor(link, out), /## OLD /, "the newest copy is the one used");
+});
+
+test("the file's intro survives when the file has no resumes yet", () => {
+  const out = mergeSection(intro, jordan, { link });
+  assert.ok(out.startsWith(intro));
+  assert.equal(sectionFor(link, out).trim(), jordan.trim());
 });
 
 test("the fact-check's sources are read for this role's link", async () => {
@@ -299,6 +335,18 @@ test("tailorRoles stops at the first sign that Claude isn't answering: that role
   assert.deepEqual(r.stopped, { link: roles[0].link, error: "success (exit 1)", left: 3 });
 });
 
+test("tailorRoles writes up to `limit` roles at once", async () => {
+  const roles = [1, 2, 3, 4].map((i) => ({ link: `https://example.com/jobs/${i}`, title: `Role ${i}`, company: "Acme" }));
+  let running = 0, most = 0;
+  const deps = { ...world({ resumes: [null], checks: [] }).deps,
+    claude: async () => { running++; most = Math.max(most, running); await new Promise((r) => setTimeout(r, 10)); running--; return { ok: true, result: "RESULT: could not tailor" }; } };
+  const results = [];
+  const r = await tailorRoles(roles, deps, { limit: 3, onResult: (role, res) => results.push(res.status) });
+  assert.equal(most, 3);
+  assert.deepEqual(results, ["Could not tailor", "Could not tailor", "Could not tailor", "Could not tailor"]);
+  assert.equal(r.stopped, null);
+});
+
 test("tailorRoles goes through every role while Claude answers", async () => {
   const roles = [{ ...ROLE }, { ...ROLE, link: "https://example.com/jobs/other" }];
   const w = world({ resumes: [jordan], checks: [allSupported] });
@@ -313,14 +361,17 @@ test("job-pull: roles go through tailorRoles, a stop leaves them New with one pl
   assert.match(src, /await tailorRoles\(/, "the run uses tailorRoles");
   assert.doesNotMatch(src, /for \(const row of waiting\)/, "no loop of its own that would keep going");
   // One line for the whole run, the first time a step comes back unavailable; never an alert per step.
-  const step = src.slice(src.indexOf("function claudeStep("), src.indexOf("\n}\n", src.indexOf("function claudeStep(")));
+  // Both step runners (blocking and side-by-side) go through the same bookkeeping.
+  assert.match(src, /function claudeStep\([^)]*\) \{\s*return noteStep\(step, runClaude\(/);
+  assert.match(src, /async function claudeStepAsync\([^)]*\) \{[\s\S]{0,240}return noteStep\(step, r\);/);
+  const step = src.slice(src.indexOf("function noteStep("), src.indexOf("\n}\n", src.indexOf("function noteStep(")));
   assert.match(step, /r\.unavailable/);
   assert.match(step, /if \(!claudeDown\)/);
   assert.match(src, /Claude isn't answering \(\$\{[^}]+\}\)\. Roles waiting for a resume stay New and are tried next run\./);
   // Once Claude is down, no more roles, no trimming (the role goes back to New) and no scout (it stays due).
   assert.match(src, /claudeDown \? \[\] : waiting/);
-  const docs = src.slice(src.indexOf("async function newResumeDocs("), src.indexOf("return { docs: out, review };"));
-  assert.match(docs, /claudeDown[\s\S]*safeStatus\(s\.url, "New"\)/);
+  const build = src.slice(src.indexOf("async function buildResume("), src.indexOf("\n}\n", src.indexOf("async function buildResume(")));
+  assert.match(build, /claudeDown[\s\S]*safeStatus\(link, "New"\)/);
   const scout = src.slice(src.indexOf("function scoutIfDue("), src.indexOf("\n}\n", src.indexOf("function scoutIfDue(")));
   assert.match(scout, /if \(claudeDown\) return;/);
   assert.match(scout, /if \(r\.unavailable\) return;/);

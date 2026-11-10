@@ -109,3 +109,50 @@ test("a failure after real work (it cost something), or a success, is not marked
   const fine = runClaude("s", "p", { ...quiet, exec: () => ({ status: 0, stdout: ok, stderr: "" }) });
   assert.deepEqual([fine.ok, fine.unavailable], [true, false]);
 });
+
+// Writers and fact-checkers run side by side (up to 3 roles at once), so a Claude run must not block the script.
+import { runClaudeAsync } from "../scripts/lib/claude.mjs";
+import { EventEmitter } from "node:events";
+const fakeSpawn = (status, out, capture = {}, delay = 5) => (cmd, args, opts) => {
+  capture.cmd = cmd; capture.args = args; capture.opts = opts;
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter(); child.stderr = new EventEmitter();
+  child.kill = () => { capture.killed = true; child.emit("close", null); };
+  if (delay !== null) setTimeout(() => { child.stdout.emit("data", Buffer.from(typeof out === "string" ? out : JSON.stringify(out))); child.emit("close", status); }, delay);
+  return child;
+};
+const asyncQuiet = { log: () => {} };
+
+test("the async run gives the same result as the blocking one", async () => {
+  const r = await runClaudeAsync("t", "p", { spawn: fakeSpawn(0, { is_error: false, subtype: "success", result: "done", total_cost_usd: 0.42, session_id: "s1", permission_denials: [] }), ...asyncQuiet });
+  assert.deepEqual([r.ok, r.result, r.costUsd, r.sessionId, r.unavailable], [true, "done", 0.42, "s1", false]);
+});
+
+test("the async run uses the same caps, scoping and deny rules", async () => {
+  const cap = {};
+  await runClaudeAsync("t", "p", { budgetUsd: 2, spawn: fakeSpawn(0, { subtype: "success" }, cap), ...asyncQuiet });
+  const a = cap.args.join(" ");
+  for (const flag of ["--output-format json", "--permission-mode dontAsk", "--setting-sources project", "--max-budget-usd 2", "--disallowedTools Bash"]) assert.ok(a.includes(flag), flag);
+  assert.equal(cap.cmd, "claude");
+});
+
+test("an async run that fails without doing any work is unavailable", async () => {
+  const r = await runClaudeAsync("t", "p", { spawn: fakeSpawn(1, { is_error: true, subtype: "success", total_cost_usd: 0 }), ...asyncQuiet });
+  assert.deepEqual([r.ok, r.unavailable], [false, true]);
+});
+
+test("an async run past the time limit is killed and marked unavailable", async () => {
+  const cap = {};
+  const r = await runClaudeAsync("t", "p", { timeoutMs: 20, spawn: fakeSpawn(0, { subtype: "success" }, cap, null), ...asyncQuiet });
+  assert.equal(cap.killed, true);
+  assert.deepEqual([r.ok, r.unavailable], [false, true]);
+  assert.match(r.error, /didn't finish within/);
+});
+
+test("two async runs overlap instead of waiting for each other", async () => {
+  let running = 0, most = 0;
+  const slow = () => { const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); running++; most = Math.max(most, running);
+    setTimeout(() => { running--; child.stdout.emit("data", Buffer.from(JSON.stringify({ subtype: "success" }))); child.emit("close", 0); }, 30); return child; };
+  await Promise.all([runClaudeAsync("a", "p", { spawn: slow, ...asyncQuiet }), runClaudeAsync("b", "p", { spawn: slow, ...asyncQuiet })]);
+  assert.equal(most, 2);
+});

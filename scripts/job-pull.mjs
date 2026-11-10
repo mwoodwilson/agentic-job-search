@@ -1,18 +1,21 @@
 #!/usr/bin/env node
 // Job Pull: the hourly job-search run (node scripts/job-pull.mjs). One run at a time (data/job-pull.lock).
 // Every rule comes from config/preferences.json; if a required setting is missing, it says what to fix and stops.
-//  1. Pulls open roles from the public job boards in search.companies (Greenhouse, Lever, Ashby, Ashby hosted
-//     pages, Gem and Workday). Keeps roles not seen before that pass the title, location and pay rules.
+// Built to be fast: a run with one new role takes a few minutes.
+//  1. Pulls open roles from every public job board in search.companies at once (Greenhouse, Lever, Ashby, Ashby
+//     hosted pages, Gem and Workday). Keeps roles not seen before that pass the title, location and pay rules.
 //  2. Logs them: data/jobs.csv (Status "New", or "Backlog" on a company's first pull: those roles were already open,
 //     so they don't all get paid resumes at once) and each role family's archive in archives/ (full job descriptions).
-//  3. Claude steps (lib/claude.mjs: capped, read-only except one named file each): import-jobs (inbox.md),
-//     update-competencies, then per "New" role the writer + checker loop (lib/tailor-loop.mjs), which ends in
-//     "Resume ready", "Could not tailor" or "Needs review" (set by code). If Claude isn't answering (not signed in, a
-//     usage limit, no network), the roles stay "New" for the next run and no more Claude steps start this run.
-//  4. Builds Word/PDF files for resumes that passed, then (only the ones turned on under notifications in the
-//     settings; all are off by default) updates the Numbers job list and texts and emails you (each message
-//     once: data/sent-log.json). Alerts for failures and broken boards; the repair and scout agents write
-//     proposals to data/proposals/. Every run ends with a log line and a snapshot in .history/.
+//  3. Reads inbox.md (import-jobs), then, if text or email is on, sends one line about the new roles (with the Numbers
+//     job list when that is on).
+//  4. Writes up to 3 resumes at once: per "New" role the writer + checker loop (lib/tailor-loop.mjs, each role in its
+//     own draft file), which ends in "Resume ready", "Could not tailor" or "Needs review" (set by code). Each resume
+//     that passes is filed in outputs/tailored-resumes.md, built as Word/PDF and sent right away in its own text and
+//     email, where those are on (each once per version: data/sent-log.json). If Claude isn't answering (not signed in,
+//     a usage limit, no network), the roles stay "New" for the next run and no more Claude steps start this run.
+//  5. After the messages: the Numbers job list (if on) gets the final statuses; update-competencies runs once a day;
+//     the repair and scout agents write proposals to data/proposals/. Every run ends with a log line and a snapshot in
+//     .history/. Claude steps (lib/claude.mjs) are capped and read-only except one named file each.
 // Flags: --no-ai (pull only; new roles stay "New" for the next full run), --backlog (add every new role as "Backlog",
 //        no resumes or messages),
 //        --numbers (only update the Numbers job list, and text it to you if iMessage is on),
@@ -25,7 +28,7 @@ import { join, dirname, relative, basename } from "node:path";
 import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { tailoredSections, buildResumeFiles, newestPerLink } from "./resume-docx.mjs";
-import { runClaude, editRule, READ } from "./lib/claude.mjs";
+import { runClaude, runClaudeAsync, editRule, READ } from "./lib/claude.mjs";
 import { isMain } from "./lib/entry.mjs";
 import { logEvent } from "./lib/log.mjs";
 import { withLock, writeAtomic } from "./lib/state.mjs";
@@ -33,7 +36,9 @@ import { getRows, setStatus } from "./lib/jobs-csv.mjs";
 import { checkResume, finalSections } from "./lib/check-resume.mjs";
 import { ensureProfileFiles } from "./lib/profile-files.mjs";
 import { restoreRulesFile } from "./lib/rules.mjs";
-import { tailorRoles, sectionFor } from "./lib/tailor-loop.mjs";
+import { tailorRoles, sectionFor, draftPathFor, mergeSection } from "./lib/tailor-loop.mjs";
+import { mapLimit, serial } from "./lib/pool.mjs";
+import { competenciesPlan, localDay } from "./lib/daily.mjs";
 import { unsent, markSent, noteChannels, resumesToRetry, versionOf, sentKey } from "./lib/sent-log.mjs";
 import { recordBoard } from "./lib/health.mjs";
 import { firstPulls, recordPulls } from "./lib/first-pull.mjs";
@@ -42,7 +47,7 @@ import { diagnoseBoard, runScout, shouldScout } from "./lib/agents.mjs";
 import { ATS_TYPES, loadSettings, withDefaults } from "./lib/settings.mjs";
 import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync } from "node:fs";
 import {
-  ROOT, DATA_DIR, CSV_FILE, SEEN_FILE, INBOX_FILE, IMPORT_FILE, TAILORED_FILE, PROFILE, STORIES,
+  ROOT, DATA_DIR, CSV_FILE, SEEN_FILE, INBOX_FILE, IMPORT_FILE, TAILORED_FILE, PROFILE, STORIES, RULES_FILE,
   CHECKS_DIR, PROPOSALS_DIR, SCOUT_FILE, SENT_LOG, ARCHIVES_DIR, PULLED_FILE, archiveFile, competenciesFile,
 } from "./lib/paths.mjs";
 
@@ -547,7 +552,10 @@ const runAlerts = [];
 // on this run starts no more resumes, trims or scout; the roles stay "New" and the next run tries again.
 let claudeDown = null;
 function claudeStep(step, prompt, writes = [], opts = {}) {
-  const r = runClaude(step, prompt, { budgetUsd: settings.claude.maxUsdPerStep, ...opts, allowedTools: [...READ, ...writes] });
+  return noteStep(step, runClaude(step, prompt, { budgetUsd: settings.claude.maxUsdPerStep, ...opts, allowedTools: [...READ, ...writes] }));
+}
+// Each step's cost, and one plain line the first time Claude isn't answering.
+function noteStep(step, r) {
   runCost.usd += r.costUsd;
   if (!r.ok && r.unavailable) {
     // One plain line for the whole run, not an alert per step.
@@ -560,21 +568,26 @@ function claudeStep(step, prompt, writes = [], opts = {}) {
   if (r.denials.length) logEvent("alert", `${step} tried a blocked action: ${r.denials.join("; ")}`);
   return r;
 }
+// The same, without blocking the script, so several resumes are written at once.
+async function claudeStepAsync(step, prompt, writes = [], opts = {}) {
+  const r = await runClaudeAsync(step, prompt, { budgetUsd: settings.claude.maxUsdPerStep, ...opts, allowedTools: [...READ, ...writes] });
+  return noteStep(step, r);
+}
 
 
-// The only messages you get, by text and by email (each only if turned on in the settings): one fixed line,
-// sent with the job list (the Numbers sheet, when that is on) and, by text, each finished resume's PDF.
-// sheet says whether the job list is attached. Problems are never messaged; they go to data/workflow-log.md.
-function runMessage({ resumes = 0, newRoles = 0, sheet = false } = {}) {
-  const n = (k, word) => `${k} ${word}${k === 1 ? "" : "s"}`;
-  let line;
-  if (resumes) line = `Job search: ${n(resumes, "new resume")} ready.`;
-  else if (newRoles) line = `Job search: ${n(newRoles, "new role")} added, no resumes created.`;
-  else return null;
+// The only messages you get, by text and by email (each only if turned on in the settings): right after the pull, one
+// line about the new roles, with the job list (the Numbers sheet, when that is on); then each resume, the moment it
+// passes, in its own text (its line and job link, then its PDF) and its own email. Problems are never messaged; they
+// go to data/workflow-log.md.
+function rolesMessage(newRoles, { sheet = false } = {}) {
+  if (!newRoles) return null;
+  const line = `Job search: ${newRoles} new role${newRoles === 1 ? "" : "s"} added.`;
   return sheet ? `${line} The job list is attached.` : line;
 }
+// The job link goes on its own line: Messages cuts off a long PDF file name.
+const resumeMessage = (title, link = "") => `Resume ready: ${title}${link ? `\n${link}` : ""}`;
 // The text after a run with nothing new, only when notifications.imessage.everyRun is on (no attachments). It is
-// sent from one place in notifyRun and is never a fallback for a run that has news but nothing new to text.
+// sent from one place, notifyNothing, and is never a fallback for a run that has news.
 const NO_MATCHES = "Run complete: no matching roles were found.";
 // --numbers: the job list alone, when Numbers is on.
 const SHEET_UPDATED = "Job search: the job list is updated and attached.";
@@ -646,50 +659,61 @@ function resumePlainText(md) {
   return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-// The newest `count` tailored resumes (they sit at the top of tailored-resumes.md), built as .docx and .pdf
-// in outputs/resumes/ with the template formatting (see resume-docx.mjs).
-async function newResumeDocs(links) {
-  const out = [], review = [];
-  for (const s of newestPerLink(await tailoredSections()).filter((x) => links.includes(x.url) && !x.short)) {
-    try {
-      let r = await buildResumeFiles(s, settings);
-      // Over one page: have tailor-resume drop the least relevant bullet, then rebuild (up to twice).
-      for (let tries = 0; r.pages > 1 && tries < 2 && !claudeDown; tries++) {
-        const trim = claudeStep(
-          `Trimming "${s.title} | ${s.company}" to one page (tailor-resume)…`,
-          `In outputs/tailored-resumes.md, the resume whose Link line is ${s.url} ("${s.title} | ${s.company}") runs to ${r.pages} pages. Remove the single least relevant bullet for that job, following profile/resume-rules.md and any minBullets under resume.roles in config/preferences.json, then update that resume's Keywords line (mark ✗ any keyword only that bullet covered), its keyword coverage count, and its Sources line (remove that bullet's entry). Change nothing else. Use the Edit tool.`,
-          [editRule("outputs/tailored-resumes.md")]
-        );
-        if (trim.unavailable) break;
-        const fresh = (await tailoredSections()).find((x) => x.url === s.url && x.short === s.short) || s;
-        r = await buildResumeFiles(fresh, settings);
-      }
-      // Claude isn't answering, so it can't be trimmed now: back to "New", and the next run checks it and trims it.
-      if (r.pages > 1 && claudeDown) {
-        safeStatus(s.url, "New");
-        console.log(`${s.title} | ${s.company} is over one page and Claude isn't answering, so it's back to New for the next run.`);
-        continue;
-      }
-      const latest = (await tailoredSections()).find((x) => x.url === s.url && x.short === s.short) || s;
-      // Trimming changed the resume, so the code checks run again before it can be sent.
-      const after = checkResume(latest.markdown, { rules: settings.resume }).problems;
-      if (r.pages > 1 || after.length) {
-        const why = r.pages > 1 ? [`still ${r.pages} pages after trimming`, ...after] : after;
-        safeStatus(s.url, "Needs review");
-        review.push({ link: s.url, title: `${s.title} | ${s.company}`, problems: why });
-        logEvent("failure", `Needs review: ${s.title} | ${s.company} after building files: ${why.slice(0, 3).join("; ")}`);
-        continue;
-      }
-      out.push({ ...r, title: `${s.title} | ${s.company}`, url: s.url, markdown: latest.markdown });
-      console.log(`Resume files: ${r.docx || r.pdf}${r.pdf ? ` + PDF (${r.pages} page${r.pages === 1 ? "" : "s"})` : ""}`);
-    } catch (e) {
-      console.log(`Couldn't build resume files for ${s.title} | ${s.company}: ${e.message}`);
-      logEvent("failure", `Couldn't build resume files for ${s.title} | ${s.company}: ${e.message}`);
-      safeStatus(s.url, "Needs review");
-      review.push({ link: s.url, title: `${s.title} | ${s.company}`, problems: [`The Word/PDF build failed: ${e.message}`] });
+// Each role's draft (data/drafts/<id>.md): the only file its writer, fact-checker and trimmer work on, so up to 3
+// roles are written at once and no Claude step edits outputs/tailored-resumes.md while other roles are filed.
+const draftFile = (link) => join(ROOT, draftPathFor(link));
+const readDraftFile = (link) => readText(draftFile(link));
+const writeDraftFile = (link, text) => { mkdirSync(dirname(draftFile(link)), { recursive: true }); writeAtomic(draftFile(link), text); };
+const clearDraftFile = (link) => rmSync(draftFile(link), { force: true });
+// Files a finished resume in outputs/tailored-resumes.md (newest first; --retailor keeps the old one as history).
+const fileSection = (link, section, { fresh = false } = {}) =>
+  writeAtomic(TAILORED_FILE, mergeSection(readText(TAILORED_FILE), section, { link, fresh }));
+
+// Builds one passed resume as .docx and .pdf in outputs/resumes/ with the template formatting (see resume-docx.mjs).
+// Over one page: tailor-resume drops the least relevant bullet in the role's draft, then it is filed again and rebuilt
+// (up to twice). Returns { doc }, { review } (held for you), or { later } (back to "New": Claude isn't answering).
+async function buildResume(link) {
+  const pick = async () => newestPerLink(await tailoredSections()).find((x) => x.url === link && !x.short);
+  let s = await pick();
+  if (!s) return { review: { link, title: link, problems: ["No resume with this link in outputs/tailored-resumes.md"] } };
+  const name = `${s.title} | ${s.company}`;
+  const held = (problems) => {
+    safeStatus(link, "Needs review");
+    logEvent("failure", `Needs review: ${name} after building files: ${problems.slice(0, 3).join("; ")}`);
+    return { review: { link, title: name, problems } };
+  };
+  try {
+    let r = await buildResumeFiles(s, settings);
+    const draft = draftPathFor(link);
+    for (let tries = 0; r.pages > 1 && tries < 2 && !claudeDown; tries++) {
+      writeDraftFile(link, s.markdown);
+      const trim = await claudeStepAsync(
+        `Trimming "${name}" to one page (tailor-resume)…`,
+        `The resume in ${draft} (Link: ${link}, "${name}") runs to ${r.pages} pages. Remove the single least relevant bullet for that job, following profile/resume-rules.md and any minBullets under resume.roles in config/preferences.json, then update that resume's Keywords line (mark ✗ any keyword only that bullet covered), its keyword coverage count, and its Sources line (remove that bullet's entry). Change nothing else. Use the Edit tool on ${draft} only.`,
+        [editRule(draft)]
+      );
+      const trimmed = sectionFor(link, readDraftFile(link));
+      clearDraftFile(link);
+      if (trim.unavailable) break;
+      if (trimmed) fileSection(link, trimmed);
+      s = (await pick()) || s;
+      r = await buildResumeFiles(s, settings);
     }
+    // Claude isn't answering, so it can't be trimmed now: back to "New", and the next run checks it and trims it.
+    if (r.pages > 1 && claudeDown) {
+      safeStatus(link, "New");
+      console.log(`${name} is over one page and Claude isn't answering, so it's back to New for the next run.`);
+      return { later: true };
+    }
+    // Trimming changed the resume, so the code checks run again before it can be sent.
+    const after = checkResume(s.markdown, { rules: settings.resume }).problems;
+    if (r.pages > 1 || after.length) return held(r.pages > 1 ? [`still ${r.pages} pages after trimming`, ...after] : after);
+    console.log(`Resume files: ${r.docx || r.pdf}${r.pdf ? ` + PDF (${r.pages} page${r.pages === 1 ? "" : "s"})` : ""}`);
+    return { doc: { ...r, title: name, url: link, markdown: s.markdown } };
+  } catch (e) {
+    console.log(`Couldn't build resume files for ${name}: ${e.message}`);
+    return held([`The Word/PDF build failed: ${e.message}`]);
   }
-  return { docs: out, review };
 }
 
 // One CSV line into cells (handles quoted cells and doubled quotes).
@@ -808,73 +832,70 @@ end run`;
 const LIVE_IO = { sendIMessage, sendEmail, logEvent };
 
 // The run's messages. Each goes only where its notification is turned on (targets, from notifyTargets); with
-// everything off nothing is sent and no files are copied. A run with nothing new texts "no matching roles were
-// found" only when everyRun is on (iMessage only). A run with news is sent only if the sheet is off or updated
-// (numbersOk); otherwise its resumes go out with a later run's message (runSkills re-queues them for each channel
-// that is on). Returns how many resumes went out (by text or email).
-// Text: one line, the job list (if on) and each finished resume's PDF. Email: the same line and the job list,
-// then one email per finished resume. Nothing else is sent. Each resume goes once per version (data/sent-log.json).
-async function notifyRun({ targets, resumeDocs, newRoles, numbersOk, io = LIVE_IO, stageDir = STAGE_DIR, sentFile = SENT_LOG, sheetFile = NUMBERS_FILE }) {
-  const news = newRoles || resumeDocs.length;
-  if (!news && targets.imessage && targets.everyRun) {
-    if (io.sendIMessage(targets.imessage, NO_MATCHES, [])) console.log(`iMessage: "${NO_MATCHES}" sent to ${targets.imessage}`);
-    else io.logEvent("failure", "The run-complete iMessage didn't send.");
-  }
-  if (!news || !(targets.imessage || targets.email) || (targets.numbers && !numbersOk)) return { resumesSent: 0 };
+// everything off nothing is sent and no files are copied. Nothing else is ever sent.
 
-  await mkdir(stageDir, { recursive: true });
+// Right after the pull: one line about the new roles, by text and by email, with the job list when the Numbers sheet
+// is on. If the sheet is on but didn't update (numbersOk false), nothing is sent: the roles are in jobs.csv and the
+// next sheet. Returns true when something went out.
+async function notifyNews({ targets, newRoles, numbersOk, io = LIVE_IO, stageDir = STAGE_DIR, sheetFile = NUMBERS_FILE }) {
+  if (!newRoles || !(targets.imessage || targets.email) || (targets.numbers && !numbersOk)) return false;
   let sheet = null;
   if (targets.numbers) {
+    await mkdir(stageDir, { recursive: true });
     sheet = join(stageDir, basename(sheetFile));
     await writeFile(sheet, await readFile(sheetFile));
   }
-  // Each resume's PDF (or the .docx if no PDF could be made), copied in beside the sheet.
-  const fileOf = async (r) => {
-    const src = r.pdf || r.docx;
-    if (!src) return null;
-    const copy = join(stageDir, src.split("/").pop());
-    await writeFile(copy, await readFile(src));
-    return copy;
-  };
-  // Each resume once per version of its text: never twice after a rerun, but again if it was re-tailored.
-  const version = (r) => versionOf(r.markdown);
-  let resumesSent = 0;
-
+  const text = rolesMessage(newRoles, { sheet: !!sheet });
+  let sent = false;
   if (targets.imessage) {
-    const resumes = [];
-    for (const r of unsent(resumeDocs, "resume-text", { version, file: sentFile })) {
-      const f = await fileOf(r);
-      if (f) resumes.push({ r, f });
-    }
-    // Only something new is texted: new roles, or resumes not texted yet. A run whose only news is a resume going out
-    // by email again (its text already went) texts nothing.
-    const text = runMessage({ resumes: resumes.length, newRoles, sheet: !!sheet });
-    if (text && io.sendIMessage(targets.imessage, text, [...(sheet ? [sheet] : []), ...resumes.map((x) => x.f)])) {
-      markSent(resumes.map(({ r }) => sentKey(r.url, "resume-text", version(r))), { file: sentFile });
-      resumesSent = resumes.length;
-      console.log(`iMessage: "${text}" with ${sheet ? "the job list and " : ""}${resumes.length} resume(s) sent to ${targets.imessage}`);
-    } else if (text) io.logEvent("failure", "The iMessage didn't send; its resumes go out with the next run's message.");
+    if (io.sendIMessage(targets.imessage, text, sheet ? [sheet] : [])) { sent = true; console.log(`iMessage: "${text}" sent to ${targets.imessage}`); }
+    else io.logEvent("failure", "The new-roles text didn't send.");
   }
-
   if (targets.email) {
-    const resumes = unsent(resumeDocs, "resume-email", { version, file: sentFile }).filter((r) => r.pdf || r.docx);
-    const text = runMessage({ resumes: resumes.length, newRoles, sheet: !!sheet });
-    if (text && io.sendEmail(targets.email, "Job search", text, sheet ? [sheet] : [])) console.log(`Email: "${text}" sent to ${targets.email}`);
-    else if (text) io.logEvent("failure", "The job search email didn't send.");
-    // A copy of each finished resume: link and full text in the body, PDF attached.
-    let emailed = 0;
-    for (const r of resumes) {
-      const body = [`Role: ${r.title}`, `Link: ${r.url}`, ...(r.pages > 1 ? ["⚠ Over one page."] : []), "", resumePlainText(r.markdown || "")].join("\n");
-      if (io.sendEmail(targets.email, `Resume: ${r.title}`, body, [await fileOf(r)])) {
-        emailed++;
-        markSent([sentKey(r.url, "resume-email", version(r))], { file: sentFile });
-      }
-    }
-    resumesSent = Math.max(resumesSent, emailed); // sent by text or by email
-    if (resumes.length) console.log(`Email: ${emailed} of ${resumes.length} resume(s) sent to ${targets.email}`);
-    if (emailed < resumes.length) io.logEvent("failure", `${resumes.length - emailed} resume email(s) didn't send.`);
+    if (io.sendEmail(targets.email, "Job search", text, sheet ? [sheet] : [])) { sent = true; console.log(`Email: "${text}" sent to ${targets.email}`); }
+    else io.logEvent("failure", "The new-roles email didn't send.");
   }
-  return { resumesSent };
+  return sent;
+}
+
+// One finished resume, the moment it passes: its own text (its line and job link, then the PDF) and its own email
+// (link and full text in the body, PDF attached). Each once per version of its text (data/sent-log.json): never twice
+// after a rerun, but again if it was re-tailored. A send that fails is logged; the resume goes out with a later run.
+// Returns { sent }: true when it went out by text or by email.
+async function notifyResume({ targets, doc: r, io = LIVE_IO, stageDir = STAGE_DIR, sentFile = SENT_LOG }) {
+  if (!(targets.imessage || targets.email)) return { sent: false };
+  const version = (x) => versionOf(x.markdown);
+  const texting = targets.imessage && unsent([r], "resume-text", { version, file: sentFile }).length > 0;
+  const emailing = targets.email && unsent([r], "resume-email", { version, file: sentFile }).length > 0;
+  const src = r.pdf || r.docx;
+  if (!src || !(texting || emailing)) return { sent: false };
+  await mkdir(stageDir, { recursive: true });
+  const file = join(stageDir, src.split("/").pop());
+  await writeFile(file, await readFile(src));
+  let sent = false;
+  if (texting) {
+    if (io.sendIMessage(targets.imessage, resumeMessage(r.title, r.url), [file])) {
+      markSent([sentKey(r.url, "resume-text", version(r))], { file: sentFile });
+      sent = true;
+      console.log(`iMessage: "Resume ready: ${r.title}" with its link and PDF sent to ${targets.imessage}`);
+    } else io.logEvent("failure", `The text for ${r.title} didn't send; it goes out with a later run.`);
+  }
+  if (emailing) {
+    const body = [`Role: ${r.title}`, `Link: ${r.url}`, ...(r.pages > 1 ? ["⚠ Over one page."] : []), "", resumePlainText(r.markdown || "")].join("\n");
+    if (io.sendEmail(targets.email, `Resume: ${r.title}`, body, [file])) {
+      markSent([sentKey(r.url, "resume-email", version(r))], { file: sentFile });
+      sent = true;
+      console.log(`Email: resume for ${r.title} sent to ${targets.email}`);
+    } else io.logEvent("failure", `The email for ${r.title} didn't send; it goes out with a later run.`);
+  }
+  return { sent };
+}
+
+// A run with nothing new (no new roles, no resume built): "no matching roles were found", only when everyRun is on.
+function notifyNothing({ targets, io = LIVE_IO }) {
+  if (!(targets.imessage && targets.everyRun)) return;
+  if (io.sendIMessage(targets.imessage, NO_MATCHES, [])) console.log(`iMessage: "${NO_MATCHES}" sent to ${targets.imessage}`);
+  else io.logEvent("failure", "The run-complete iMessage didn't send.");
 }
 
 // --numbers: update the Numbers sheet from jobs.csv (e.g. after changing statuses by hand) and, when iMessage is
@@ -963,69 +984,155 @@ async function restoreRoleGuides(saved) {
 
 // Links given with --retailor this run: tailored fresh even though a resume exists.
 const retailor = new Set();
-async function runSkills(kept, archivesGrew, seen, today, stamp) {
-  // 1. Roles dropped in inbox.md: the skill reads them into data/inbox-import.json, then the script adds them
-  //    to jobs.csv and the archives (also picks up a file left by a failed run).
+// Roles dropped in inbox.md: the skill reads them into data/inbox-import.json, then the script adds them to jobs.csv
+// and the archives (also picks up a file left by a failed run).
+async function readInbox(seen, today, stamp) {
   if (await inboxHasEntries()) {
     claudeStep("Reading roles from inbox.md (import-jobs)…", "Use the import-jobs skill: read the entries in inbox.md into data/inbox-import.json.",
       [editRule("inbox.md"), editRule("data/inbox-import.json")]);
   }
-  const { imported, grew } = await importInbox(seen, today, stamp);
-  for (const f of grew) if (!archivesGrew.includes(f)) archivesGrew.push(f);
-  if (archivesGrew.length) {
-    const guides = await readRoleGuides();
-    const rel = (f) => relative(ROOT, f);
-    claudeStep(
-      `Updating competencies for ${archivesGrew.join(", ")} (update-competencies)…`,
-      `Use the update-competencies skill on these archives, which just got new postings: ${archivesGrew.map((fam) => `${rel(archiveFile(fam))} (competencies file: ${rel(competenciesFile(fam))})`).join(", ")}.`,
-      [editRule("archives/competencies-*.md")]
-    );
-    await restoreRoleGuides(guides);
+  return importInbox(seen, today, stamp);
+}
+
+// The files each writer and fact-checker needs, put at the top of its prompt so it doesn't spend turns opening
+// them. The same files come first in the same order, so runs share a cached prefix.
+const fileBlock = (path, text, note = "") => `<file path="${path}"${note ? ` note="${note}"` : ""}>\n${String(text).trim()}\n</file>`;
+const LOADED = "The files below are already loaded from the project: use them as given and don't open them again (you can still read any other file you need).";
+function sharedFiles(link) {
+  return [
+    fileBlock("profile/resume-rules.md", readText(RULES_FILE)),
+    fileBlock("profile/profile.md", readText(PROFILE)),
+    fileBlock("profile/stories.md", readText(STORIES)),
+    fileBlock("outputs/tailored-resumes.md", finalSections(readText(TAILORED_FILE), { exclude: link }) || "(none yet)", "only the resumes you finalized, the sections with a Final: line"),
+  ];
+}
+// The role's own section of its archive (from its ## heading to the next ---), and the role family it's in.
+function jobSection(link) {
+  for (const { name } of settings.search.families) {
+    const text = readText(archiveFile(name));
+    const at = text.indexOf(`**Link:** ${link}`);
+    if (at < 0) continue;
+    const start = text.lastIndexOf("\n## ", at) + 1;
+    const end = text.indexOf("\n---\n", at);
+    return { family: name, text: text.slice(start, end < 0 ? text.length : end) };
   }
-  // 2. A tailored resume for every role with Status "New", one role at a time: writer + checker loop
-  //    (lib/tailor-loop.mjs). Code sets each Status from the result; Claude never edits jobs.csv.
+  return null;
+}
+// The fact-checker's common stretches, shown to the writer too, so a first draft doesn't repeat them.
+function commonStretches() {
+  const text = readText(join(ROOT, ".claude/skills/check-resume/SKILL.md"));
+  const a = text.indexOf("## Common stretches");
+  if (a < 0) return "";
+  const b = text.indexOf("\n## ", a + 3);
+  return text.slice(a, b < 0 ? text.length : b).replace(/\nNever edit any file except the JSON output\.\s*$/, "").trim();
+}
+function writerFiles(link) {
+  const rel = (f) => relative(ROOT, f);
+  const parts = [LOADED, ...sharedFiles(link)];
+  const stretches = commonStretches();
+  if (stretches) parts.push(fileBlock(".claude/skills/check-resume/SKILL.md", stretches, "the fact-checker's common stretches: a line that matches one is sent back"));
+  const job = jobSection(link);
+  if (job) {
+    parts.push(fileBlock(rel(archiveFile(job.family)), job.text, "only this role's section"));
+    const guide = guideBlock(readText(competenciesFile(job.family)));
+    if (guide) parts.push(fileBlock(rel(competenciesFile(job.family)), guide, "only the role guide; the analysis of real postings below it is in the file if you need phrasing"));
+  }
+  return parts.join("\n\n");
+}
+const checkerFiles = (link, section) =>
+  [LOADED, ...sharedFiles(link), fileBlock(draftPathFor(link), section, "the resume to check")].join("\n\n");
+
+// Every "New" role gets a resume, up to 3 written at once. Each one that passes is filed in outputs/tailored-resumes.md,
+// built and sent right away; builds and sends go one at a time (Pages, Messages). Code sets each Status from the
+// result; Claude never edits jobs.csv. Returns { review, built, sent, couldNot }.
+const PARALLEL_RESUMES = 3;
+const oneAtATime = serial();
+async function tailorAll() {
   mkdirSync(CHECKS_DIR, { recursive: true });
   const deps = {
-    claude: claudeStep,
+    claude: claudeStepAsync,
     readTailored: () => readText(TAILORED_FILE),
-    writeTailored: (text) => writeAtomic(TAILORED_FILE, text),
+    readDraft: readDraftFile,
+    writeDraft: writeDraftFile,
     readSources,
     readCheck: (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), "utf8")); } catch { return null; } },
     clearCheck: (p) => rmSync(join(ROOT, p), { force: true }),
     rules: settings.resume,
+    writerFiles,
+    checkerFiles,
   };
-  const passed = [], review = [];
-  let couldNot = 0;
+  const review = [];
+  const counts = { built: 0, sent: 0, couldNot: 0 };
+  const deliver = (link) => oneAtATime(async () => {
+    try {
+      const b = await buildResume(link);
+      if (b.review) { review.push(b.review); return; }
+      if (b.later) return;
+      counts.built++;
+      if ((await notifyResume({ targets: TARGETS, doc: b.doc })).sent) counts.sent++;
+    } catch (e) {
+      // One resume that can't be built or sent never stops the others; it stays "Resume ready" and goes out later.
+      review.push({ link, title: link, problems: [`Building or sending stopped: ${e.message}`] });
+      logEvent("failure", `Building or sending the resume for ${link} stopped: ${e.message}`);
+    }
+  });
+  // Ready resumes that didn't go out on a channel that is on (an earlier run stopped before sending, or a send
+  // failed), listed before this run builds any. A resume that was already ready when a channel was turned on is never
+  // sent on it (lib/sent-log.mjs).
+  const tailoredNow = readText(TAILORED_FILE);
+  const earlier = resumesToRetry(getRows(), { channels: { "resume-text": !!TARGETS.imessage, "resume-email": !!TARGETS.email }, builtNow: [], sectionOf: (link) => sectionFor(link, tailoredNow) });
+  const deliveries = earlier.map(deliver);
   // Each link once, even if a row was duplicated by hand.
   const waiting = getRows().filter((r, i, all) => r.Status === "New" && all.findIndex((x) => x.Link === r.Link) === i);
   if (!waiting.length) console.log("\nNo new roles to tailor resumes for.");
   else if (claudeDown) console.log(`\nClaude isn't answering, so ${waiting.length} role(s) stay New for the next run.`);
-  // One role at a time; it stops when Claude isn't answering, and those roles keep the Status "New".
+  // Up to 3 roles at once; once Claude isn't answering, no more start, and those roles keep the Status "New".
   const roles = (claudeDown ? [] : waiting).map((row) => ({ link: row.Link, title: row.Title, company: row.Company, fresh: retailor.has(row.Link) }));
-  const { stopped } = await tailorRoles(roles, deps, { onResult: (role, res) => {
-    const row = { Link: role.link, Title: role.title, Company: role.company };
-    const name = `${row.Title} | ${row.Company}`;
-    safeStatus(row.Link, res.status);
+  const { stopped } = await tailorRoles(roles, deps, { limit: PARALLEL_RESUMES, onResult: (role, res) => {
+    const name = `${role.title} | ${role.company}`;
+    if (res.section) fileSection(role.link, res.section, { fresh: role.fresh });
+    clearDraftFile(role.link);
+    safeStatus(role.link, res.status);
     console.log(`→ ${name}: ${res.status} (${res.tries} tr${res.tries === 1 ? "y" : "ies"})`);
     if (res.status === "Resume ready") {
-      passed.push(row.Link);
       logEvent("success", `Resume ready: ${name} (passed code checks and fact-check on try ${res.tries})`);
+      deliveries.push(deliver(role.link)); // built and sent while the next role is being written
     } else if (res.status === "Could not tailor") {
-      couldNot++;
+      counts.couldNot++;
       logEvent("run", `Could not tailor ${name}: under 70% keyword coverage with true material`);
     } else {
-      review.push({ link: row.Link, title: name, problems: res.problems });
+      review.push({ link: role.link, title: name, problems: res.problems });
       logEvent("failure", `Needs review: ${name} after ${res.tries} tries: ${res.problems.slice(0, 3).join("; ")}`);
     }
   } });
   if (stopped) console.log(`\nClaude isn't answering (${stopped.error}), so ${stopped.left} role(s) stay New for the next run.`);
+  await Promise.all(deliveries);
   await sortJobsCsv(); // keep newest first
-  // Plus any ready resume that didn't go out on a channel that is on: an earlier run stopped before sending, a send
-  // failed, or the Numbers sheet didn't update. A resume that was already ready when a channel was turned on is
-  // never sent on it (lib/sent-log.mjs).
-  const tailoredNow = readText(TAILORED_FILE);
-  for (const l of resumesToRetry(getRows(), { channels: { "resume-text": !!TARGETS.imessage, "resume-email": !!TARGETS.email }, builtNow: [...passed], sectionOf: (link) => sectionFor(link, tailoredNow) })) passed.push(l);
-  return { passed, review, imported, couldNot };
+  return { review, ...counts };
+}
+
+// update-competencies, once a day, after the messages: role families whose archive grew wait in data/competencies.json
+// until the day's first run. A run that can't update (--no-ai, or Claude isn't answering) or whose update fails leaves
+// them waiting.
+const COMPETENCIES_STATE = join(DATA_DIR, "competencies.json");
+async function competenciesOnceADay(grew, { run = true } = {}) {
+  let state = null;
+  try { state = JSON.parse(readFileSync(COMPETENCIES_STATE, "utf8")); } catch {}
+  const today = localDay();
+  const plan = competenciesPlan(state, today, grew);
+  let next = { last: state?.last || null, pending: plan.pending };
+  if (run && !claudeDown && plan.files.length) {
+    const guides = await readRoleGuides();
+    const rel = (f) => relative(ROOT, f);
+    const r = claudeStep(
+      `Updating competencies for ${plan.files.join(", ")} (update-competencies)…`,
+      `Use the update-competencies skill on these archives, which got new postings: ${plan.files.map((fam) => `${rel(archiveFile(fam))} (competencies file: ${rel(competenciesFile(fam))})`).join(", ")}.`,
+      [editRule("archives/competencies-*.md")]
+    );
+    await restoreRoleGuides(guides);
+    if (r.ok) next = { last: today, pending: [] };
+  }
+  if (JSON.stringify(next) !== JSON.stringify(state)) writeAtomic(COMPETENCIES_STATE, JSON.stringify(next, null, 1));
 }
 
 // jobs.csv is a running list: new roles are added and never removed, then it's sorted newest first.
@@ -1244,33 +1351,32 @@ function finishRun(stamp, counts = {}) {
   logAlerts();
 }
 
-// Reads every company's board. Returns { kept, problems, firstPull, readOk }: kept, the postings that pass the title
-// and location rules; problems, the companies whose board couldn't be read; firstPull, the names of the companies
-// whose board is being read for the first time (lib/first-pull.mjs); readOk, the boards read successfully, which the
-// run records once their roles are written. fetchBoard, record, pulledFile, pause and log are stand-ins for tests.
-async function pullCompanies(companies, { known = new Set(), seen = {}, fetchBoard = fetchCompany, record = recordBoard, pulledFile = PULLED_FILE, pause = 500, log = console.log } = {}) {
+// Reads every company's board, up to 8 at once (one at a time took minutes; now it takes about as long as the slowest
+// board). Results are logged in the list's order. Returns { kept, problems, firstPull, readOk }: kept, the postings that
+// pass the title and location rules; problems, the companies whose board couldn't be read; firstPull, the names of the
+// companies whose board is being read for the first time (lib/first-pull.mjs); readOk, the boards read successfully,
+// which the run records once their roles are written. fetchBoard, record, pulledFile, limit and log are stand-ins for tests.
+async function pullCompanies(companies, { known = new Set(), seen = {}, fetchBoard = fetchCompany, record = recordBoard, pulledFile = PULLED_FILE, limit = 8, log = console.log } = {}) {
   const kept = [], problems = [], readOk = [];
-  for (const c of companies) {
-    try {
-      const board = await fetchBoard(c, known, seen);
-      if (board === null) {
-        problems.push(c.name);
-        log(`✗ ${c.name}: board not found. Check the slug "${c.slug}" in its careers URL.`);
-        boardAlert(record(c.name, { error: `board not found (slug "${c.slug}")` }), c);
-      } else {
-        const hits = board.jobs.filter((j) => passesFilters(j));
-        kept.push(...hits);
-        readOk.push(c);
-        log(`✓ ${c.name}: ${hits.length} match (of ${board.open} open)`);
-        boardAlert(record(c.name, { open: board.open }), c);
-      }
-    } catch (err) {
+  const boards = await mapLimit(companies, limit, (c) => fetchBoard(c, known, seen));
+  boards.forEach((board, i) => {
+    const c = companies[i];
+    if (board instanceof Error) {
       problems.push(c.name);
-      log(`✗ ${c.name}: ${err.message}`);
-      boardAlert(record(c.name, { error: err.message }), c);
+      log(`✗ ${c.name}: ${board.message}`);
+      boardAlert(record(c.name, { error: board.message }), c);
+    } else if (board === null) {
+      problems.push(c.name);
+      log(`✗ ${c.name}: board not found. Check the slug "${c.slug}" in its careers URL.`);
+      boardAlert(record(c.name, { error: `board not found (slug "${c.slug}")` }), c);
+    } else {
+      const hits = board.jobs.filter((j) => passesFilters(j));
+      kept.push(...hits);
+      readOk.push(c);
+      log(`✓ ${c.name}: ${hits.length} match (of ${board.open} open)`);
+      boardAlert(record(c.name, { open: board.open }), c);
     }
-    if (pause) await sleep(pause);
-  }
+  });
   return { kept, problems, firstPull: firstPulls(readOk, { file: pulledFile }), readOk };
 }
 
@@ -1368,31 +1474,33 @@ async function main() {
     return;
   }
   const noAi = process.argv.includes("--no-ai");
+  // The inbox first, so its roles are in the new-roles message and get resumes this run.
+  const inbox = noAi ? { imported: [], grew: [] } : await readInbox(seen, today, stamp);
+  const newRoles = kept.length + inbox.imported.length;
+
+  // 1. One line about the new roles, right away (with the job list when the Numbers sheet is on).
+  // 2. Resumes, up to 3 at once, each sent the moment it passes. Sends go one at a time, the new-roles line first; the
+  //    writers start while the sheet is being updated and sent.
+  const newsSent = newRoles && (TARGETS.imessage || TARGETS.email)
+    ? oneAtATime(async () => notifyNews({ targets: TARGETS, newRoles, numbersOk: TARGETS.numbers ? await syncNumbers() : false }))
+      .catch((e) => logEvent("failure", `The new-roles message stopped: ${e.message}`))
+    : null;
+  const result = noAi ? null : tailorAll();
+  await newsSent;
+  const done = (await result) || { review: [], built: 0, sent: 0, couldNot: 0 };
+
+  // 3. A run with nothing new texts "no matching roles were found", only when everyRun is on.
+  if (!newRoles && !done.built) notifyNothing({ targets: TARGETS });
+
+  // 4. After the messages: the Numbers copy of jobs.csv (only when it's turned on) gets the final statuses, then the
+  //    slower upkeep: competencies (once a day), board repairs, and the scout when it is due.
+  if (TARGETS.numbers) await syncNumbers();
+  await competenciesOnceADay([...new Set([...grew, ...inbox.grew])], { run: !noAi });
   if (plan.repairBoards) repairBoards();
-  const result = noAi ? null : await runSkills(kept, grew, seen, today, stamp);
-
-  // Word and PDF files for each resume that passed, formatted like the templates.
-  const review = result?.review || [];
-  const built = result?.passed?.length ? await newResumeDocs(result.passed) : { docs: [], review: [] };
-  review.push(...built.review);
-  const resumeDocs = built.docs;
-  const ready = resumeDocs.length;
-
-  // The Numbers copy of jobs.csv (only when it's turned on), updated before sending so the copy sent to you is current.
-  const numbersOk = TARGETS.numbers ? await syncNumbers() : false;
-
-  // Message you only where a notification is turned on, and only when there's something to look at: new roles or
-  // finished resumes. With notifications.imessage.everyRun on, a run with nothing new also texts "no matching roles
-  // were found". If the sheet is on and didn't update, a run with news sends nothing; its resumes go out with a
-  // later run's message.
-  const imported = result?.imported || [];
-  const newRoles = kept.length + imported.length;
-  const { resumesSent } = await notifyRun({ targets: TARGETS, resumeDocs, newRoles, numbersOk });
-
   if (!noAi) scoutIfDue();
 
   // Anything that went wrong this run (failed steps, broken boards) goes to workflow-log.md; then the snapshot.
-  finishRun(stamp, { added: kept.length, firstBacklog, built: ready, sent: resumesSent, held: review.length, couldNot: result?.couldNot || 0, notify: !!(TARGETS.imessage || TARGETS.email) });
+  finishRun(stamp, { added: kept.length, firstBacklog, built: done.built, sent: done.sent, held: done.review.length, couldNot: done.couldNot, notify: !!(TARGETS.imessage || TARGETS.email) });
 }
 
 // Runs only when started as a program (node scripts/job-pull.mjs), so tests can import the functions.
@@ -1419,6 +1527,6 @@ if (isMain(import.meta.url)) {
 
 export {
   useSettings, pullCompanies, landingStatus, passesFilters, compStatus, archiveFor, orderJobsCsv, extractAshbyPostings, fetchCompany, runPlan, ensureInbox,
-  notifyTargets, notifyRun, numbersOnly, unsentAlert, NO_MATCHES, SHEET_UPDATED, SHEET_OFF, payMax, workdayPay, workdayListBody, fetchWorkday, ashbyJobs, ashbyUrl, runSummary, runMessage, resumePlainText,
-  CSV_FILE, TAILORED_FILE, readSources,
+  notifyTargets, notifyNews, notifyResume, notifyNothing, numbersOnly, unsentAlert, NO_MATCHES, SHEET_UPDATED, SHEET_OFF, payMax, workdayPay, workdayListBody, fetchWorkday, ashbyJobs, ashbyUrl, runSummary, rolesMessage, resumeMessage, resumePlainText,
+  CSV_FILE, TAILORED_FILE, readSources, writerFiles, checkerFiles, jobSection,
 };

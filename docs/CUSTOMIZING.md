@@ -125,17 +125,17 @@ node scripts/job-pull.mjs --retailor 'https://example.com/jobs/123'
 
 The address is the role's Link in `data/jobs.csv`. The old resume stays in `outputs/tailored-resumes.md` as history. Add `--resume-only` to skip checking the job boards and just write.
 
-Three skills use the same files when you want them: `/craft-stories` turns your raw notes into polished interview stories, `/interview-prep` runs a mock interview for a specific job, and `/update-competencies` rebuilds what the archived postings ask for. The hourly run also updates competencies by itself whenever an archive grows.
+Three skills use the same files when you want them: `/craft-stories` turns your raw notes into polished interview stories, `/interview-prep` runs a mock interview for a specific job, and `/update-competencies` rebuilds what the archived postings ask for. The hourly run also updates competencies by itself, once a day, after an archive grows.
 
 ## What gets sent
 
 Only what you turned on.
 
-- **Text:** when a run has news, one line: "Job search: 2 new resumes ready." (or "1 new role added, no resumes created."), with the job list attached if the Numbers sheet is on, and each finished resume's PDF. With `notifications.imessage.everyRun` on, a run with nothing new also texts "Run complete: no matching roles were found."
-- **Email:** only when there is news: the same line (with the job list attached, if the Numbers sheet is on), then one email per finished resume with its text in the body and its PDF attached.
+- **Text:** right after the pull, when a run added roles, one line: "Job search: 3 new roles added." with the job list attached if the Numbers sheet is on. Then each resume, the moment it passes, in its own text: "Resume ready: <title> | <company>" with the job link on the next line, then its PDF. With `notifications.imessage.everyRun` on, a run with nothing new also texts "Run complete: no matching roles were found."
+- **Email:** only when there is news: the same new-roles line (with the job list attached, if the Numbers sheet is on), then one email per finished resume, as it passes, with the job link and its text in the body and its PDF attached.
 - **Numbers sheet:** a copy of `data/jobs.csv`, rewritten on every run. Change a role's Status in the CSV, in a text editor, not in Numbers: opening the CSV in Numbers saves a separate `.numbers` copy, so the change never reaches the pipeline. `node scripts/job-pull.mjs --numbers` refreshes it after a manual change.
 
-Each resume goes once per version, so a rerun never repeats it, but a re-tailored resume goes out again. A resume that didn't go out (a send failed, or the Numbers sheet didn't update so the run held its message back) is sent with a later run, by text and by email alike. Turning text or email on later doesn't send the resumes made before: only resumes made from then on go out. Problems, broken boards and proposals are never sent: they're written to `data/workflow-log.md`. Attachments are staged in `~/Pictures/agentic-job-search`.
+Each resume goes once per version, so a rerun never repeats it, but a re-tailored resume goes out again. A resume that didn't go out (a send failed, or the run stopped first) is sent with a later run, by text and by email alike. If the Numbers sheet is on but didn't update, the new-roles line waits for a later run's sheet; finished resumes still go out. Turning text or email on later doesn't send the resumes made before: only resumes made from then on go out. Problems, broken boards and proposals are never sent: they're written to `data/workflow-log.md`. Attachments are staged in `~/Pictures/agentic-job-search`.
 
 ## The job list
 

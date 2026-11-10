@@ -1,4 +1,6 @@
 // What the run sends (text and email): the job list (Numbers), finished resumes, and fixed lines. Nothing else.
+// Right after the pull, one line about the new roles (with the job list when the sheet is on); then each resume, the
+// moment it passes, in its own text (its line and job link, then the PDF) and its own email.
 // Everything is off until it is turned on in the settings (notifications). Problems (failed steps, broken boards,
 // scout and repair proposals) go to workflow-log.md only.
 // These tests never send a message, open an app or touch iCloud: sending is stubbed or the function is pure.
@@ -7,7 +9,7 @@ import assert from "node:assert/strict";
 import { readFileSync, mkdtempSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { notifyTargets, runMessage, notifyRun, numbersOnly, runSummary, unsentAlert, NO_MATCHES, SHEET_UPDATED, SHEET_OFF } from "../scripts/job-pull.mjs";
+import { notifyTargets, rolesMessage, resumeMessage, notifyNews, notifyResume, notifyNothing, numbersOnly, runSummary, unsentAlert, NO_MATCHES, SHEET_UPDATED, SHEET_OFF } from "../scripts/job-pull.mjs";
 import { withDefaults } from "../scripts/lib/settings.mjs";
 import { filledSettings } from "./helpers.mjs";
 
@@ -47,17 +49,14 @@ test("an address that is filled in but turned off is not used; turned on with no
 
 // ---- the lines ----
 
-test("message lines", () => {
-  assert.equal(runMessage({ resumes: 2, sheet: true }), "Job search: 2 new resumes ready. The job list is attached.");
-  assert.equal(runMessage({ resumes: 1 }), "Job search: 1 new resume ready.");
-  assert.equal(runMessage({ newRoles: 3, sheet: true }), "Job search: 3 new roles added, no resumes created. The job list is attached.");
-  assert.equal(runMessage({}), null);
+test("the new-roles line, with and without the job list", () => {
+  assert.equal(rolesMessage(3, { sheet: true }), "Job search: 3 new roles added. The job list is attached.");
+  assert.equal(rolesMessage(1), "Job search: 1 new role added.");
+  assert.equal(rolesMessage(0, { sheet: true }), null, "no new roles: no line");
 });
 
-test("message lines: one role, and the same lines without the job list", () => {
-  assert.equal(runMessage({ newRoles: 1 }), "Job search: 1 new role added, no resumes created.");
-  assert.equal(runMessage({ resumes: 2, newRoles: 5, sheet: false }), "Job search: 2 new resumes ready.");
-  assert.equal(runMessage({ resumes: 0, newRoles: 0, sheet: true }), null, "nothing new: no message, even with the sheet on");
+test("each resume's line names the role and gives its job link (Messages cuts off long file names)", () => {
+  assert.equal(resumeMessage("Role One, Acme", "https://jobs.example.com/1"), "Resume ready: Role One, Acme\nhttps://jobs.example.com/1");
 });
 
 // With everyRun on, a run with nothing new texts this fixed line, with no attachments.
@@ -88,129 +87,134 @@ function world({ imessageOk = true, emailOk = true } = {}) {
 }
 const off = { imessage: null, email: null, numbers: false, everyRun: false };
 const base = (name) => name.split("/").pop();
+const newsOpts = ({ io, stageDir, sheetFile }) => ({ io, stageDir, sheetFile });
+const resumeOpts = ({ io, stageDir, sentFile }) => ({ io, stageDir, sentFile });
 
-test("all notifications off: a run with news sends nothing and stages nothing", async () => {
+test("all notifications off: nothing is sent, staged or marked as sent", async () => {
   const w = world();
-  const r = await notifyRun({ targets: off, resumeDocs: w.docs, newRoles: 3, numbersOk: false, ...w.opts });
+  assert.equal(await notifyNews({ targets: off, newRoles: 3, numbersOk: false, ...newsOpts(w.opts) }), false);
+  for (const doc of w.docs) assert.deepEqual(await notifyResume({ targets: off, doc, ...resumeOpts(w.opts) }), { sent: false });
+  notifyNothing({ targets: off, io: w.opts.io });
   assert.deepEqual(w.calls, { texts: [], emails: [], logs: [] });
-  assert.equal(r.resumesSent, 0);
   assert.equal(existsSync(w.opts.stageDir), false, "no files were copied for attachments");
   assert.equal(existsSync(w.opts.sentFile), false, "nothing was marked as sent");
 });
 
-test("all notifications off: a run with nothing new sends nothing", async () => {
+test("iMessage on with everyRun, nothing new: the no-matching-roles text, no files, no email", () => {
   const w = world();
-  await notifyRun({ targets: off, resumeDocs: [], newRoles: 0, numbersOk: false, ...w.opts });
-  assert.deepEqual(w.calls, { texts: [], emails: [], logs: [] });
-});
-
-test("iMessage on with everyRun, nothing new: the no-matching-roles text, no files, no email", async () => {
-  const w = world();
-  await notifyRun({ targets: { ...off, imessage: PHONE, everyRun: true }, resumeDocs: [], newRoles: 0, numbersOk: false, ...w.opts });
+  notifyNothing({ targets: { ...off, imessage: PHONE, email: EMAIL, everyRun: true }, io: w.opts.io });
   assert.deepEqual(w.calls.texts, [{ to: PHONE, text: NO_MATCHES, files: [] }]);
   assert.deepEqual(w.calls.emails, []);
 });
 
 test("iMessage on without everyRun (the default), nothing new: no text at all", async () => {
   const w = world();
-  await notifyRun({ targets: { ...off, imessage: PHONE }, resumeDocs: [], newRoles: 0, numbersOk: false, ...w.opts });
+  notifyNothing({ targets: { ...off, imessage: PHONE }, io: w.opts.io });
+  assert.equal(await notifyNews({ targets: { ...off, imessage: PHONE, numbers: true }, newRoles: 0, numbersOk: true, ...newsOpts(w.opts) }), false);
   assert.deepEqual(w.calls, { texts: [], emails: [], logs: [] });
-  await notifyRun({ targets: { ...off, imessage: PHONE, numbers: true }, resumeDocs: [], newRoles: 0, numbersOk: true, ...w.opts });
-  assert.deepEqual(w.calls.texts, [], "not with the sheet on either");
 });
 
 test("email only, nothing new: nothing is sent (email goes only when there is news)", async () => {
   const w = world();
-  await notifyRun({ targets: { ...off, email: EMAIL }, resumeDocs: [], newRoles: 0, numbersOk: false, ...w.opts });
+  notifyNothing({ targets: { ...off, email: EMAIL }, io: w.opts.io });
+  await notifyNews({ targets: { ...off, email: EMAIL }, newRoles: 0, numbersOk: false, ...newsOpts(w.opts) });
   assert.deepEqual(w.calls, { texts: [], emails: [], logs: [] });
 });
 
-test("iMessage only, with resumes: one text with just the resume PDFs (no sheet), marked as sent", async () => {
+test("iMessage only: each resume is its own text, its line and link with just its PDF (no sheet), marked as sent", async () => {
   const w = world();
-  const r = await notifyRun({ targets: { ...off, imessage: PHONE }, resumeDocs: w.docs, newRoles: 2, numbersOk: false, ...w.opts });
-  assert.equal(w.calls.texts.length, 1);
-  const [t] = w.calls.texts;
-  assert.equal(t.to, PHONE);
-  assert.equal(t.text, "Job search: 2 new resumes ready.");
-  assert.deepEqual(t.files.map(base), ["Resume One.pdf", "Resume Two.pdf"]);
-  assert.ok(t.files.every((f) => f.startsWith(w.opts.stageDir)), "attachments are copies in the stage folder");
+  for (const doc of w.docs) assert.deepEqual(await notifyResume({ targets: { ...off, imessage: PHONE }, doc, ...resumeOpts(w.opts) }), { sent: true });
+  assert.deepEqual(w.calls.texts.map((t) => [t.to, t.text, t.files.map(base)]), [
+    [PHONE, "Resume ready: Role One, Acme\nhttps://jobs.example.com/1", ["Resume One.pdf"]],
+    [PHONE, "Resume ready: Role Two, Acme\nhttps://jobs.example.com/2", ["Resume Two.pdf"]],
+  ]);
+  assert.ok(w.calls.texts.every((t) => t.files.every((f) => f.startsWith(w.opts.stageDir))), "attachments are copies in the stage folder");
   assert.deepEqual(readdirSync(w.opts.stageDir).sort(), ["Resume One.pdf", "Resume Two.pdf"], "the sheet was not copied");
-  assert.equal(r.resumesSent, 2);
   assert.equal(Object.keys(JSON.parse(readFileSync(w.opts.sentFile, "utf8"))).length, 2);
   assert.deepEqual(w.calls.emails, []);
 });
 
-test("iMessage and Numbers, new roles but no resumes: the job list is attached", async () => {
+test("a resume is never sent twice on the same channel (the same version)", async () => {
   const w = world();
-  await notifyRun({ targets: { ...off, imessage: PHONE, numbers: true }, resumeDocs: [], newRoles: 3, numbersOk: true, ...w.opts });
+  const targets = { ...off, imessage: PHONE };
+  await notifyResume({ targets, doc: w.docs[0], ...resumeOpts(w.opts) });
+  assert.deepEqual(await notifyResume({ targets, doc: w.docs[0], ...resumeOpts(w.opts) }), { sent: false });
+  assert.equal(w.calls.texts.length, 1);
+});
+
+test("iMessage and Numbers, new roles: the line with the job list attached", async () => {
+  const w = world();
+  assert.equal(await notifyNews({ targets: { ...off, imessage: PHONE, numbers: true }, newRoles: 3, numbersOk: true, ...newsOpts(w.opts) }), true);
   assert.equal(w.calls.texts.length, 1);
   const [t] = w.calls.texts;
-  assert.equal(t.text, "Job search: 3 new roles added, no resumes created. The job list is attached.");
+  assert.equal(t.text, "Job search: 3 new roles added. The job list is attached.");
   assert.deepEqual(t.files, [join(w.opts.stageDir, "Agentic Job Search.numbers")]);
   assert.equal(readFileSync(t.files[0], "utf8"), "sheet");
 });
 
-test("Numbers on but the sheet didn't update: a run with news sends nothing (it goes with the next run); the every-run text still goes", async () => {
+test("Numbers on but the sheet didn't update: the new-roles line isn't sent, but finished resumes still go out", async () => {
   const w = world();
-  await notifyRun({ targets: { ...off, imessage: PHONE, email: EMAIL, numbers: true, everyRun: true }, resumeDocs: w.docs, newRoles: 2, numbersOk: false, ...w.opts });
+  const targets = { ...off, imessage: PHONE, email: EMAIL, numbers: true };
+  assert.equal(await notifyNews({ targets, newRoles: 2, numbersOk: false, ...newsOpts(w.opts) }), false);
   assert.deepEqual(w.calls, { texts: [], emails: [], logs: [] });
-  await notifyRun({ targets: { ...off, imessage: PHONE, email: EMAIL, numbers: true, everyRun: true }, resumeDocs: [], newRoles: 0, numbersOk: false, ...w.opts });
-  assert.deepEqual(w.calls.texts, [{ to: PHONE, text: NO_MATCHES, files: [] }]);
-  assert.deepEqual(w.calls.emails, []);
+  assert.deepEqual(await notifyResume({ targets, doc: w.docs[0], ...resumeOpts(w.opts) }), { sent: true });
+  assert.equal(w.calls.texts.length, 1);
+  assert.deepEqual(w.calls.emails.map((e) => e.subject), ["Resume: Role One, Acme"]);
 });
 
 test("email only, new roles: one email with the fixed line and no attachment", async () => {
   const w = world();
-  await notifyRun({ targets: { ...off, email: EMAIL }, resumeDocs: [], newRoles: 3, numbersOk: false, ...w.opts });
+  await notifyNews({ targets: { ...off, email: EMAIL }, newRoles: 3, numbersOk: false, ...newsOpts(w.opts) });
   assert.deepEqual(w.calls.texts, []);
-  assert.deepEqual(w.calls.emails, [{ to: EMAIL, subject: "Job search", body: "Job search: 3 new roles added, no resumes created.", files: [] }]);
+  assert.deepEqual(w.calls.emails, [{ to: EMAIL, subject: "Job search", body: "Job search: 3 new roles added.", files: [] }]);
 });
 
-test("email and Numbers, with resumes: the line with the sheet, then one email per resume", async () => {
+test("email and Numbers: the line with the sheet, then one email per resume as each passes", async () => {
   const w = world();
-  await notifyRun({ targets: { ...off, email: EMAIL, numbers: true }, resumeDocs: w.docs, newRoles: 2, numbersOk: true, ...w.opts });
+  const targets = { ...off, email: EMAIL, numbers: true };
+  await notifyNews({ targets, newRoles: 2, numbersOk: true, ...newsOpts(w.opts) });
+  for (const doc of w.docs) await notifyResume({ targets, doc, ...resumeOpts(w.opts) });
   const [summary, ...each] = w.calls.emails;
-  assert.equal(summary.body, "Job search: 2 new resumes ready. The job list is attached.");
+  assert.equal(summary.body, "Job search: 2 new roles added. The job list is attached.");
   assert.deepEqual(summary.files, [join(w.opts.stageDir, "Agentic Job Search.numbers")]);
   assert.deepEqual(each.map((e) => e.subject), ["Resume: Role One, Acme", "Resume: Role Two, Acme"]);
   assert.deepEqual(each.map((e) => e.files.map(base)), [["Resume One.pdf"], ["Resume Two.pdf"]]);
-  assert.ok(each.every((e) => e.to === EMAIL));
+  assert.ok(each.every((e) => e.to === EMAIL && e.body.includes("Link: https://jobs.example.com/")));
   assert.deepEqual(w.calls.texts, []);
 });
 
-test("resumes that went out by email only still count as sent", async () => {
+test("a resume that went out by email only still counts as sent", async () => {
   const w = world();
-  const r = await notifyRun({ targets: { ...off, email: EMAIL }, resumeDocs: w.docs, newRoles: 2, numbersOk: false, ...w.opts });
-  assert.equal(r.resumesSent, 2);
+  assert.deepEqual(await notifyResume({ targets: { ...off, email: EMAIL }, doc: w.docs[0], ...resumeOpts(w.opts) }), { sent: true });
 });
 
-// A resume whose text went out but whose email failed is re-queued for email the next run. That run has a resume
-// (so it has news) but nothing new to text: it must not fall back to the every-run line, which only everyRun sends.
-test("text and email on, a resume already texted whose email failed: the retry run sends no text (everyRun off)", async () => {
+// A resume whose text went out but whose email failed is re-queued for email the next run. That run texts nothing
+// for it, and never falls back to the every-run line, which only everyRun sends from a run with nothing new.
+test("text and email on, a resume already texted whose email failed: the retry sends only the email", async () => {
   const w = world({ emailOk: false });
   const targets = { ...off, imessage: PHONE, email: EMAIL };
-  await notifyRun({ targets, resumeDocs: [w.docs[0]], newRoles: 1, numbersOk: false, ...w.opts });
+  await notifyResume({ targets, doc: w.docs[0], ...resumeOpts(w.opts) });
   assert.equal(w.calls.texts.length, 1, "the first run texts the resume");
   w.calls.texts.length = 0;
   w.calls.emails.length = 0;
-  // The next run re-queues it for email; nothing new otherwise.
-  await notifyRun({ targets, resumeDocs: [w.docs[0]], newRoles: 0, numbersOk: false, ...w.opts });
-  assert.deepEqual(w.calls.texts, [], "no text: no 'no matching roles' line, no empty line");
-  assert.deepEqual(w.calls.emails.map((e) => e.subject), ["Job search", "Resume: Role One, Acme"], "the email is retried");
+  await notifyResume({ targets, doc: w.docs[0], ...resumeOpts(w.opts) });
+  assert.deepEqual(w.calls.texts, [], "no second text");
+  assert.deepEqual(w.calls.emails.map((e) => e.subject), ["Resume: Role One, Acme"], "the email is retried");
 });
 
-test("the every-run line is sent only from the nothing-new branch, never as a fallback", () => {
+test("the every-run line is sent only from notifyNothing, never as a fallback", () => {
   const sends = [...src.matchAll(/io\.sendIMessage\(targets\.imessage, NO_MATCHES/g)];
   assert.equal(sends.length, 1);
-  const fn = src.slice(src.indexOf("async function notifyRun("), src.indexOf("\n}\n", src.indexOf("async function notifyRun(")));
-  assert.equal((fn.match(/NO_MATCHES/g) || []).length, 2, "only in the !news && everyRun branch (its send and its log line)");
+  const fn = src.slice(src.indexOf("function notifyNothing("), src.indexOf("\n}\n", src.indexOf("function notifyNothing(")));
+  assert.match(fn, /io\.sendIMessage\(targets\.imessage, NO_MATCHES, \[\]\)/);
+  assert.match(src, /if \(!newRoles && !done\.built\) notifyNothing\(\{ targets: TARGETS \}\);/, "only when the run has nothing new");
   assert.doesNotMatch(src, /function runText\(/, "no helper that falls back to it");
 });
 
-test("a text that fails to send is logged, and its resumes are not marked as sent", async () => {
+test("a text that fails to send is logged, and its resume is not marked as sent", async () => {
   const w = world({ imessageOk: false });
-  const r = await notifyRun({ targets: { ...off, imessage: PHONE }, resumeDocs: w.docs, newRoles: 2, numbersOk: false, ...w.opts });
-  assert.equal(r.resumesSent, 0);
+  const r = await notifyResume({ targets: { ...off, imessage: PHONE }, doc: w.docs[0], ...resumeOpts(w.opts) });
+  assert.deepEqual(r, { sent: false });
   assert.equal(w.calls.logs.length, 1);
   assert.equal(w.calls.logs[0].kind, "failure");
   assert.equal(existsSync(w.opts.sentFile), false);
@@ -232,7 +236,7 @@ test("with a notification on, a resume built but not sent is still called out", 
 });
 
 test("ready resumes that didn't go out are re-queued for each channel that is on: text and email", () => {
-  assert.match(src, /resumesToRetry\(getRows\(\), \{ channels: \{ "resume-text": !!TARGETS\.imessage, "resume-email": !!TARGETS\.email \}, builtNow: \[\.\.\.passed\]/);
+  assert.match(src, /resumesToRetry\(getRows\(\), \{ channels: \{ "resume-text": !!TARGETS\.imessage, "resume-email": !!TARGETS\.email \}, builtNow: \[\]/);
   assert.doesNotMatch(src, /if \(TARGETS\.imessage\) for \(const l of pendingResumes\(/);
 });
 
@@ -273,21 +277,21 @@ test("--numbers when the sync fails: no text", async () => {
 
 // ---- what the code is allowed to send ----
 
-test("every text sends only the run's line, the no-matches line or the --numbers line", () => {
+test("every text sends only the new-roles line, a resume's line, the no-matches line or the --numbers line", () => {
   const calls = [...src.matchAll(/io\.sendIMessage\(([^\n]*)/g)].map((m) => m[1]);
-  assert.ok(calls.length >= 3, "the no-matches text, the run's text and the --numbers text");
-  for (const a of calls) assert.match(a, /^targets\.imessage, (NO_MATCHES|text|SHEET_UPDATED), /, `unexpected text: io.sendIMessage(${a}`);
+  assert.ok(calls.length >= 4, "the no-matches text, the new-roles text, each resume's text and the --numbers text");
+  for (const a of calls) assert.match(a, /^targets\.imessage, (NO_MATCHES|text|resumeMessage\(r\.title, r\.url\)|SHEET_UPDATED), /, `unexpected text: io.sendIMessage(${a}`);
 });
 
 test("every email is the run's line (with the sheet only when it's on), or one finished resume", () => {
   const calls = [...src.matchAll(/io\.sendEmail\(([^\n]*)/g)].map((m) => m[1]);
   assert.ok(calls.length >= 2);
-  for (const a of calls) assert.match(a, /^targets\.email, ("Job search", text, sheet \? \[sheet\] : \[\]|`Resume: \$\{r\.title\}`)/, `unexpected email: io.sendEmail(${a}`);
+  for (const a of calls) assert.match(a, /^targets\.email, ("Job search", text, sheet \? \[sheet\] : \[\]|`Resume: \$\{r\.title\}`, body, \[file\])/, `unexpected email: io.sendEmail(${a}`);
 });
 
 test("the Numbers sync runs only when notifications.numbers is on", () => {
   const calls = src.split("\n").filter((l) => /\bsyncNumbers\(\)/.test(l) && !/^\s*(async )?function /.test(l) && !/^\s*\/\//.test(l));
-  assert.ok(calls.length >= 2, "the run and the backlog catch-up");
+  assert.ok(calls.length >= 3, "the new-roles line, the end of the run and the backlog catch-up");
   for (const l of calls) assert.match(l, /targets\.numbers/i, `ungated sync: ${l.trim()}`);
 });
 

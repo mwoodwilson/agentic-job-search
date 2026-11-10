@@ -7,16 +7,14 @@ One rule shapes the whole design: **code decides, Claude judges.** A plain Node 
 `node scripts/job-pull.mjs` is the run. The hourly job is just this command on a schedule.
 
 1. **Start.** Load `config/preferences.json` and stop with a plain list of problems if a required setting is missing, before any file is touched. Take the lock, make any missing profile file from its template, and put the hard-rules block back if it was edited.
-2. **Pull.** Read each company's public job board (Greenhouse, Lever, Ashby, Gem or Workday). Keep roles that pass the title, place and pay rules and haven't been seen before: not by link, and not by the same company and title under another link.
+2. **Pull.** Read every company's public job board (Greenhouse, Lever, Ashby, Gem or Workday), up to 8 at once, so the pull takes about as long as the slowest board. Keep roles that pass the title, place and pay rules and haven't been seen before: not by link, and not by the same company and title under another link.
 3. **List and archive.** Add each new role to `data/jobs.csv` (newest first) and its full description to the archive for its role family in `archives/`. A new role gets the Status `New`, except on the first successful read of a company's board (`data/boards-pulled.json` keeps each board read so far): the roles already open there get `Backlog`, so adding a company never queues every open role for a paid resume.
-4. **Repair.** Right after the pull, if a board has failed three runs in a row, the repair agent investigates and writes a proposal.
-5. **Inbox.** If `inbox.md` has entries, Claude reads them (import-jobs) and code adds them to the same list and archives.
-6. **Competencies.** For each archive that grew, Claude updates that family's competencies file: what the postings ask for and how your profile covers it.
-7. **Write and check.** For every role with the Status `New`, one at a time, the writer and checker loop runs (below).
-8. **Build.** Each resume that passed becomes a Word file and a PDF. A resume over one page goes back to the writer to drop its least relevant bullet, up to twice, and then the code checks run again. A resume still over one page after two trims, one that fails the code checks after trimming, or a file build that fails, ends as `Needs review`.
-9. **Notify.** Only the notifications you turned on: text, email, the Numbers sheet.
-10. **Scout.** If the weekly scout is on and due, it runs now, after everything else, and writes a proposal.
-11. **Finish.** When anything happened (a new role, a resume, a hold, a role that could not be tailored, or a problem), write one summary line to the log. Save the run to the history folder if anything changed, and write anything that went wrong to `data/workflow-log.md`.
+4. **Inbox.** If `inbox.md` has entries, Claude reads them (import-jobs) and code adds them to the same list and archives.
+5. **New roles.** If text or email is on and the run added roles, one line goes out right away: "Job search: N new roles added." (with the job list attached when the Numbers sheet is on).
+6. **Write and check.** For every role with the Status `New`, up to 3 at once, the writer and checker loop runs (below). Each role is written in its own draft file (`data/drafts/`), and code files it in `outputs/tailored-resumes.md` once the loop ends. The writer and the fact-checker get the files they need (your profile, stories, rules, finalized resumes, the job's description and role guide) in the prompt, so they don't spend turns opening them.
+7. **Build and send.** Each resume that passed becomes a Word file and a PDF the moment it passes, while the next roles are still being written, and goes out right away in its own text (its line and job link, then the PDF) and its own email, where those are on. Builds and sends go one at a time. A resume over one page goes back to the writer to drop its least relevant bullet, up to twice, and then the code checks run again. A resume still over one page after two trims, one that fails the code checks after trimming, or a file build that fails, ends as `Needs review`.
+8. **Upkeep.** After the messages: the Numbers sheet (if on) gets the final statuses; once a day, the first run after new postings were archived updates those families' competencies files (what the postings ask for and how your profile covers it; `data/competencies.json` keeps what's waiting); if a board has failed three runs in a row, the repair agent investigates and writes a proposal; and if the weekly scout is on and due, it runs and writes a proposal.
+9. **Finish.** When anything happened (a new role, a resume, a hold, a role that could not be tailored, or a problem), write one summary line to the log. Save the run to the history folder if anything changed, and write anything that went wrong to `data/workflow-log.md`.
 
 Other ways to run it: `--no-ai` (pull and list roles only, no Claude calls; new roles stay `New`, so the next full run writes their resumes), `--backlog` (add every new role as `Backlog`, no resumes or messages), `--resume-only` (skip the job boards: import the inbox, write for `New` roles, build and send), `--retailor <link>` (write a fresh resume for a role that already has one; the old one stays as history) and `--numbers` (only refresh the Numbers sheet).
 
@@ -42,7 +40,7 @@ Other ways to run it: `--no-ai` (pull and list roles only, no Claude calls; new 
 
 `scripts/lib/tailor-loop.mjs`, for one role, with at most 3 tries (`MAX_TRIES`):
 
-1. **Write.** The writer (the `tailor-resume` skill) writes the resume from the job description, your profile and your stories (`profile/profile.md` and `profile/stories.md`, both living documents you keep adding to), and saves it as a new section of `outputs/tailored-resumes.md`. On a later try it gets the list of problems and fixes only those lines. If it changed any other resume in that file, the edit is undone and the writer is told.
+1. **Write.** The writer (the `tailor-resume` skill) writes the resume from the job description, your profile and your stories (`profile/profile.md` and `profile/stories.md`, both living documents you keep adding to), and saves it in the role's own draft file (`data/drafts/`), the only file it can write; code files the finished resume in `outputs/tailored-resumes.md`. On a later try it gets the list of problems and fixes only those lines.
 2. **Code checks.** Five of the six hard rules (summary length, bullet length, a number in every bullet, time-bound results, keyword coverage) plus your own rules from the settings. Hard rule 5, that every line is backed by your files, is confirmed in step 4. A resume that breaks a rule goes straight back to the writer, so the paid fact-check waits for a version that passes.
 3. **Fact-check.** A separate Claude run (the `check-resume` skill) judges every summary sentence and every bullet as supported, stretched or unsupported, and for each supported line copies the exact line from your files that backs it. It never edits the resume. If it writes nothing, or skips lines, that is the checker's problem, not the writer's: it is rerun once and the writer isn't called.
 4. **Quotes verified by code.** This is hard rule 5. `verifyCheck` confirms that every line has a verdict, that each quote is at least 15 characters long and really appears in one of your files (`profile/profile.md`, `profile/stories.md`, or a resume you finalized, never the resume being checked), and that each keyword the resume claims is really in it. It recomputes keyword coverage from that, and at least 70% is required.
@@ -114,7 +112,7 @@ Every step can use its skill and read files inside the project folder, and nothi
 **Tests** run with `node --test` and are free: no Claude calls, and only the made-up example person (Jordan Reyes) for resumes and settings. They cover, among other things:
 
 - the six hard rules, one change at a time (`tests/check-resume.test.mjs`);
-- the writer and checker loop with a stand-in for Claude: retries, holds, a fact-check that never finishes, a writer that edits other resumes (`tests/tailor-loop.test.mjs`);
+- the writer and checker loop with a stand-in for Claude: retries, holds, a fact-check that never finishes, the writer limited to its own draft, several roles at once (`tests/tailor-loop.test.mjs`);
 - every message that can be sent, and that nothing is sent when notifications are off (`tests/messages.test.mjs`);
 - settings validation, the schedule installer and the setup check (`tests/settings.test.mjs`, `tests/install-schedule.test.mjs`, `tests/check-setup.test.mjs`);
 - that every Claude run is limited to its named files (`tests/permissions.test.mjs`), and that every skill names only files that exist and no one's personal details (`tests/skills.test.mjs`);
@@ -128,6 +126,6 @@ Every step can use its skill and read files inside the project folder, and nothi
 - A quiet run makes no Claude calls.
 - Each Claude step is capped by `claude.maxUsdPerStep` (default $3); the scout by `claude.maxUsdScout` (default $5).
 - A full resume (writer plus fact-check, up to 3 tries) typically costs about $2 to $4 (measured: $2.92 over three tries in the acceptance run; runs have ranged from about $1 to $5). It depends on your default Claude model and on retries, which can go up to the per-step caps.
-- A run that adds postings to an archive also updates that family's competencies file (`update-competencies`), one more capped step.
+- Once a day, the first run after new postings were archived updates those families' competencies files (`update-competencies`), one more capped step.
 - The ceiling for one role in one run is 11 capped steps: 3 writer runs, 6 fact-check runs (each of 3 tries can need one rerun) and 2 trims. Lower `claude.maxUsdPerStep` for a tighter ceiling.
 - On a Claude Pro or Max plan this counts against plan usage; with an API key it is billed.

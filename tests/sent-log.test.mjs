@@ -76,7 +76,8 @@ test("a role texted as 'No resume' is texted again once it has a resume", async 
 
 test("job-pull sends ready resumes that didn't go out along with this run's", () => {
   const src = readFileSync(new URL("../scripts/job-pull.mjs", import.meta.url), "utf8");
-  assert.match(src, /for \(const l of resumesToRetry\(getRows\(\), \{[^\n]*sectionOf/);
+  assert.match(src, /const earlier = resumesToRetry\(getRows\(\), \{[^\n]*sectionOf/);
+  assert.match(src, /const deliveries = earlier\.map\(deliver\);/, "each one is built and sent like this run's");
 });
 
 test("a resume's version ignores the trailing --- divider, so both code paths agree and no false 'not sent' alert is raised", async () => {
@@ -126,7 +127,7 @@ test("job-pull notes the channels at the start of the run, before any resume is 
   const main = src.slice(src.indexOf("async function main()"));
   const noted = main.indexOf("noteChannels(getRows(), {");
   assert.ok(noted > 0, "main calls noteChannels");
-  assert.ok(noted < main.indexOf("await runSkills("), "before tailoring");
+  assert.ok(noted < main.indexOf("tailorAll()"), "before tailoring");
   assert.ok(noted < main.indexOf('safeStatus(link, "New")'), "before --retailor puts a role back to New");
 });
 
@@ -152,33 +153,34 @@ test("email turned on later emails no old resume either", async () => {
   assert.deepEqual(resumesToRetry(ready(1, 2), { channels: { "resume-text": false, "resume-email": true }, builtNow: [], sectionOf, file: f }), []);
 });
 
-// Email on, iMessage off, the Numbers sheet on: a run whose sheet didn't update sends nothing. Its resumes must go
-// out with a later run, as the log line says ("they'll be sent next run").
-test("email-only resumes held back by a failed sheet update are emailed on the next run", async () => {
+// Email on, iMessage off: each resume is emailed the moment it passes. One whose email failed must go out with a
+// later run, as the log line says ("they'll be sent next run").
+test("a resume whose email failed is emailed on the next run, then never again", async () => {
   const { resumesToRetry } = await import("../scripts/lib/sent-log.mjs");
-  const { notifyRun, unsentAlert } = await import("../scripts/job-pull.mjs");
+  const { notifyResume, unsentAlert } = await import("../scripts/job-pull.mjs");
   const dir = mkdtempSync(join(tmpdir(), "email-retry-"));
-  const sentFile = join(dir, "sent-log.json"), sheetFile = join(dir, "Agentic Job Search.numbers");
-  writeFileSync(sheetFile, "sheet");
+  const sentFile = join(dir, "sent-log.json");
   const pdf = join(dir, "Resume 1.pdf");
   writeFileSync(pdf, "pdf");
   const doc = { url: "https://jobs.example.com/1", title: "Role 1, Acme", markdown: section(1), pdf, pages: 1 };
   const emails = [];
-  const io = { sendIMessage: () => assert.fail("iMessage is off"), sendEmail: (to, subject) => { emails.push(subject); return true; }, logEvent: () => {} };
+  let mailWorks = false;
+  const io = { sendIMessage: () => assert.fail("iMessage is off"), sendEmail: (to, subject) => { emails.push(subject); return mailWorks; }, logEvent: () => {} };
   const targets = { imessage: null, email: "jordan@example.com", numbers: true, everyRun: false };
   const channels = { "resume-text": false, "resume-email": true };
-  const opts = { io, stageDir: join(dir, "stage"), sentFile, sheetFile };
+  const opts = { io, stageDir: join(dir, "stage"), sentFile };
 
-  // Run 1 builds resume 1; the sheet fails, so nothing is sent.
+  // Run 1 builds resume 1; Mail fails, so it isn't marked as sent.
   assert.deepEqual(resumesToRetry(ready(1), { channels, builtNow: [doc.url], sectionOf, file: sentFile }), []);
-  const first = await notifyRun({ targets, resumeDocs: [doc], newRoles: 1, numbersOk: false, ...opts });
-  assert.deepEqual(emails, []);
-  assert.equal(unsentAlert({ built: 1, sent: first.resumesSent, notify: true }), "1 resume(s) were built but didn't go out; they'll be sent next run.");
-  // Run 2 builds nothing new, but re-queues resume 1, and the sheet works: it is emailed.
+  const first = await notifyResume({ targets, doc, ...opts });
+  assert.equal(first.sent, false);
+  assert.equal(unsentAlert({ built: 1, sent: 0, notify: true }), "1 resume(s) were built but didn't go out; they'll be sent next run.");
+  // Run 2 builds nothing new, but re-queues resume 1, and Mail works: it is emailed.
+  mailWorks = true;
   assert.deepEqual(resumesToRetry(ready(1), { channels, builtNow: [], sectionOf, file: sentFile }), [doc.url]);
-  const second = await notifyRun({ targets, resumeDocs: [doc], newRoles: 0, numbersOk: true, ...opts });
-  assert.deepEqual(emails, ["Job search", "Resume: Role 1, Acme"]);
-  assert.equal(second.resumesSent, 1);
+  const second = await notifyResume({ targets, doc, ...opts });
+  assert.equal(second.sent, true);
+  assert.deepEqual(emails, ["Resume: Role 1, Acme", "Resume: Role 1, Acme"]);
   // Run 3: it went out, so it isn't sent again.
   assert.deepEqual(resumesToRetry(ready(1), { channels, builtNow: [], sectionOf, file: sentFile }), []);
 });
