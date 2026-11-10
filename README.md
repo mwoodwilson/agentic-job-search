@@ -1,6 +1,6 @@
 # Agentic Job Search
 
-An hourly job-search pipeline for Mac and Claude Code. It watches the job boards of the companies you pick and writes a fact-checked, one-page resume for each new role, using only your own true experience.
+An hourly job-search pipeline for Mac and Claude Code. It watches the job boards of the companies you pick and writes a fact-checked, one-page resume for each new role, using only your own true experience. Note- if you're looking for zero-effort agentic job search systems that will apply to jobs on your behalf, this is not for you. The job search process should require effort and critical thinking, and most modern agentic job search workflows offload both to AI. in my opinion, you're trading quality and honesty for convenience. This workflow automates the toilsome parts of job seeking (identifying roles, tailoring resumes, interview prep, among others), while ensuring the user is still in control of quality and submission.
 
 ![Agentic job search workflow](docs/assets/workflow-poster.png)
 
