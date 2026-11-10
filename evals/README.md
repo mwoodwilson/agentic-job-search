@@ -1,5 +1,7 @@
 # Evals
 
+The why, the design and the latest results are in [docs/EVALS.md](../docs/EVALS.md). This page covers running the evals and adding cases.
+
 An eval tests the fact-checker itself, not the hourly run. Each case is a resume where the right answer is already known: the finished example resume is true, so the fact-checker must approve it, and copies of it with one planted problem must be caught. If it gets every case right, its verdicts on your own resumes can be trusted.
 
 The cases use the made-up person in `examples/` (Jordan Reyes), never your own profile or resumes. Run them after any change to the `check-resume` skill, the code checks or the Claude model. Target: every case passes.
