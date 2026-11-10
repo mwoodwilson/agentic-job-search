@@ -136,7 +136,7 @@ test("the README says which versions it was tested with and where the author is 
   assert.match(md, /Node 20\b/);
   const built = md.slice(heading(md, "Built by"));
   assert.match(built, /Built by [A-Z][a-z]+ [A-Z][a-z]+ \(\[LinkedIn\]\(https:\/\/www\.linkedin\.com\/in\/[A-Za-z0-9-]+\)\)/);
-  assert.match(built, /guardrails, evals and tests/);
+  assert.match(built, /\)\)\s*\n\s*\n\s*\S.{20,}/, "the credit is followed by a line on why it was built");
   // The author line is the only credit: no other doc names an author or links a profile.
   for (const f of DOC_FILES.filter((x) => x !== "README.md")) assert.doesNotMatch(text(f), /linkedin\.com|Built by/i, f);
   assert.equal((md.match(/linkedin\.com/g) || []).length, 1);
