@@ -1,0 +1,59 @@
+{
+  "_about": "Your settings: copy this file to config/preferences.json, then replace every null and add at least one company (/setup can walk you through it). Lines that start with _ are notes and are ignored.",
+  "candidate": {
+    "_about": "Who the resumes are for. Your name and contact line are printed at the top of every resume, exactly as you write them here.",
+    "name": null,
+    "contact": null
+  },
+  "search": {
+    "_about": "What to look for. Add companies with node scripts/find-board.mjs, which turns the address of one of a company's job postings into the line to paste here; the other settings decide which roles are kept (docs/CUSTOMIZING.md explains each).",
+    "companies": [],
+    "titleKeywords": null,
+    "titleExclude": [],
+    "locationKeywords": null,
+    "usOnly": true,
+    "pay": null,
+    "families": [{ "name": "Jobs", "titleKeywords": [] }]
+  },
+  "resume": {
+    "_about": "How resumes are built. roles lists your past jobs, each as { \"title\": \"Senior PM\", \"companyLine\": \"Larkfield (Chicago, IL) · 2020 – 2024\", \"minBullets\": 2 }, banned lists wording to keep out, each as { \"pattern\": \"a regular expression\", \"why\": \"the reason\" }, and maxBullets caps the bullets under one role (null for no limit).",
+    "template": "templates/resume-template.docx",
+    "roles": [],
+    "maxBullets": null,
+    "note": "",
+    "banned": []
+  },
+  "notifications": {
+    "_about": "Where to hear about new resumes: everything is off until you turn it on. Text and email each need an address; the Numbers sheet needs none.",
+    "imessage": {
+      "_about": "Text message through the Messages app. Turn it on and put your phone number in to; everyRun true also texts after every run that found nothing new (about 24 texts a day with the hourly schedule).",
+      "enabled": false,
+      "to": "",
+      "everyRun": false
+    },
+    "email": {
+      "_about": "Email through the Mail app. Turn it on and put your email address in to.",
+      "enabled": false,
+      "to": ""
+    },
+    "numbers": {
+      "_about": "Keeps a spreadsheet of every role in the Numbers app. It needs no address.",
+      "enabled": false
+    }
+  },
+  "schedule": {
+    "_about": "Whether the job pull runs by itself every hour: set hourly to true and run node scripts/install-schedule.mjs, or leave it off and run the pull yourself.",
+    "hourly": false,
+    "scout": {
+      "_about": "Once a week, look for new companies worth watching (about $5 of Claude usage a run). day is a day of the week and hour is 0 to 23.",
+      "enabled": false,
+      "day": "Monday",
+      "hour": 9
+    }
+  },
+  "claude": {
+    "_about": "Spending limits in US dollars: maxUsdPerStep caps each Claude step and maxUsdScout caps the weekly scout. A step stops once it reaches its limit.",
+    "maxUsdPerStep": 3,
+    "maxUsdScout": 5
+  }
+}

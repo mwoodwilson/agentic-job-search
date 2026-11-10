@@ -1,0 +1,182 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 2268" width="1600" height="2268" role="img" aria-label="Agentic job search workflow: an hourly run pulls company job boards, filters and lists roles, writes a resume for each, checks the hard rules in code, fact-checks every line against your files with each quote confirmed by code, tries up to 3 times, and builds Word and PDF files; notifications are off until you turn them on, and alerts go to the log. An optional inbox adds jobs. A repair agent and a scout agent only propose fixes and new companies for your approval.">
+<rect width="1600" height="2268" fill="#F2F4F1"/>
+<text x="100" y="108" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="17" font-weight="500" fill="#1C8C5E" text-anchor="start" letter-spacing="2">AGENTIC JOB SEARCH  ·  BUILT WITH CLAUDE CODE</text>
+<text x="100" y="190" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="58" font-weight="800" fill="#14202B" text-anchor="start">A job search that runs itself, and never lies for you.</text>
+<text x="100" y="248" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#56636D" text-anchor="start">Every hour it finds new roles, writes a resume for each one from your own experience, and fact-checks</text>
+<text x="100" y="282" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#56636D" text-anchor="start">every line against your files. Notifications stay off until you want them. Agents only propose changes.</text>
+<path d="M 200 480 H 1080 Q 1140 480 1140 540 V 770 Q 1140 830 1080 830 H 140 Q 80 830 80 890 V 1120 Q 80 1180 140 1180 H 740" fill="none" stroke="#2457D6" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+<defs><marker id="arrowRed" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#C9372C"/></marker><marker id="arrowGreen" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1C8C5E"/></marker><marker id="arrowInk" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#14202B"/></marker></defs>
+<path d="M 470 802 C 470 665, 1010 665, 1010 796" fill="none" stroke="#C9372C" stroke-width="7" stroke-dasharray="2 13" stroke-linecap="round" marker-end="url(#arrowRed)"/>
+<text x="740" y="684" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="17" font-weight="500" fill="#C9372C" text-anchor="middle">a problem? back to the writer to revise · up to 3 tries</text>
+<path d="M 470 854 V 980" stroke="#C9372C" stroke-width="7" stroke-linecap="round"/>
+<rect x="183" y="463" width="34" height="34" rx="5" fill="#FFFFFF" stroke="#2457D6" stroke-width="6"/>
+<text x="200" y="530" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#14202B" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">Every hour</text>
+<text x="200" y="555" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">launchd starts the run</text>
+<text x="200" y="576" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">on your Mac</text>
+<rect x="453" y="463" width="34" height="34" rx="5" fill="#FFFFFF" stroke="#2457D6" stroke-width="6"/>
+<text x="470" y="530" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#14202B" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">Pull job boards</text>
+<text x="470" y="555" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">Greenhouse · Lever · Ashby</text>
+<text x="470" y="576" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">Gem · Workday</text>
+<rect x="723" y="463" width="34" height="34" rx="5" fill="#FFFFFF" stroke="#2457D6" stroke-width="6"/>
+<text x="740" y="530" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#14202B" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">Filter and dedupe</text>
+<text x="740" y="555" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">title · place · pay floor</text>
+<text x="740" y="576" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">no role listed twice</text>
+<rect x="993" y="463" width="34" height="34" rx="5" fill="#FFFFFF" stroke="#2457D6" stroke-width="6"/>
+<text x="1010" y="530" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#14202B" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">List the role</text>
+<text x="1010" y="555" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">data/jobs.csv + the full</text>
+<text x="1010" y="576" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">description in archives/</text>
+<circle cx="1010" cy="830" r="19" fill="#FFFFFF" stroke="#D9822B" stroke-width="7"/>
+<circle cx="1010" cy="830" r="6" fill="#D9822B"/>
+<text x="1010" y="880" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#14202B" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">Write the resume</text>
+<text x="1010" y="905" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">writer: tailor-resume</text>
+<text x="1010" y="926" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">one role per run</text>
+<rect x="723" y="813" width="34" height="34" rx="5" fill="#FFFFFF" stroke="#2457D6" stroke-width="6"/>
+<text x="740" y="880" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#14202B" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">Code checks</text>
+<text x="740" y="905" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">5 of the 6 hard rules</text>
+<text x="740" y="926" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">+ your own rules</text>
+<rect x="223" y="813" width="34" height="34" rx="5" fill="#FFFFFF" stroke="#2457D6" stroke-width="6"/>
+<text x="240" y="880" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#14202B" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">Build Word + PDF</text>
+<text x="240" y="905" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">one page, in your template</text>
+<text x="240" y="926" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">PDF is made by Pages</text>
+<circle cx="470" cy="830" r="19" fill="#FFFFFF" stroke="#D9822B" stroke-width="7"/>
+<circle cx="470" cy="830" r="6" fill="#D9822B"/>
+<text x="446" y="730" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#14202B" text-anchor="end" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">Fact-checker</text>
+<text x="446" y="755" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="end" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">a separate Claude run: every line</text>
+<text x="446" y="776" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="end" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">quoted from your files, quotes</text>
+<text x="446" y="797" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="end" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">confirmed by code (rule 5)</text>
+<rect x="383" y="1163" width="34" height="34" rx="5" fill="#FFFFFF" stroke="#2457D6" stroke-width="6"/>
+<text x="400" y="1232" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#14202B" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">Notify, if turned on</text>
+<text x="400" y="1257" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">text · email · Numbers sheet</text>
+<text x="400" y="1278" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">never sent twice</text>
+<circle cx="740" cy="1180" r="22" fill="#14202B"/>
+<circle cx="740" cy="1180" r="12" fill="#FFFFFF"/>
+<text x="740" y="1232" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#14202B" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">You review and apply</text>
+<text x="740" y="1257" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">keep adding true detail to</text>
+<text x="740" y="1278" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="middle" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">profile.md and stories.md</text>
+<circle cx="470" cy="990" r="22" fill="#14202B"/>
+<circle cx="470" cy="990" r="12" fill="#FFFFFF"/>
+<text x="440" y="994" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#14202B" text-anchor="end" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">Held for your review</text>
+<text x="440" y="1019" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="end" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">after 3 tries, with the</text>
+<text x="440" y="1040" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16.5" font-weight="400" fill="#56636D" text-anchor="end" stroke="#F2F4F1" stroke-width="6" stroke-linejoin="round" paint-order="stroke">reasons in the log</text>
+<rect x="155.5" y="588" width="89" height="22" rx="11" fill="#FFFFFF" stroke="#14202B" stroke-width="1.5"/>
+<text x="200" y="603.5" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="12" font-weight="500" fill="#14202B" text-anchor="middle" letter-spacing="1">MAC ONLY</text>
+<rect x="195.5" y="938" width="89" height="22" rx="11" fill="#FFFFFF" stroke="#14202B" stroke-width="1.5"/>
+<text x="240" y="953.5" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="12" font-weight="500" fill="#14202B" text-anchor="middle" letter-spacing="1">MAC ONLY</text>
+<rect x="355.5" y="1290" width="89" height="22" rx="11" fill="#FFFFFF" stroke="#14202B" stroke-width="1.5"/>
+<text x="400" y="1305.5" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="12" font-weight="500" fill="#14202B" text-anchor="middle" letter-spacing="1">MAC ONLY</text>
+<rect x="850" y="298" width="340" height="92" rx="12" fill="#FFFFFF" stroke="#D5DBD6" stroke-width="2"/>
+<text x="874" y="331" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="14.5" font-weight="500" fill="#D9822B" text-anchor="start" letter-spacing="1.5">OPTIONAL INBOX</text>
+<text x="874" y="356" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="17" font-weight="500" fill="#14202B" text-anchor="start">inbox.md, filled by you, OpenClaw</text>
+<text x="874" y="379" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="17" font-weight="500" fill="#14202B" text-anchor="start">or any agent. Read on the next run.</text>
+<path d="M 1010 392 V 458" stroke="#F2F4F1" stroke-width="13" fill="none"/>
+<path d="M 1010 392 V 458" stroke="#14202B" stroke-width="4" fill="none" marker-end="url(#arrowInk)"/>
+<rect x="650" y="970" width="440" height="140" rx="12" fill="#FFFFFF" stroke="#D5DBD6" stroke-width="2"/>
+<text x="674" y="1006" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="14.5" font-weight="500" fill="#D9822B" text-anchor="start" letter-spacing="1.5">WHAT IT WRITES FROM: YOUR FILES</text>
+<text x="674" y="1038" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="16.5" font-weight="500" fill="#14202B" text-anchor="start">config/preferences.json</text>
+<text x="674" y="1064" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="16.5" font-weight="500" fill="#14202B" text-anchor="start">profile/profile.md · profile/stories.md</text>
+<text x="674" y="1090" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="16.5" font-weight="500" fill="#14202B" text-anchor="start">profile/resume-rules.md</text>
+<rect x="880" y="1132" width="310" height="130" rx="12" fill="#FFFFFF" stroke="#D5DBD6" stroke-width="2"/>
+<text x="904" y="1168" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="14.5" font-weight="500" fill="#C9372C" text-anchor="start" letter-spacing="1.5">ALERTS AND PROBLEMS</text>
+<text x="904" y="1198" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="17.5" font-weight="500" fill="#14202B" text-anchor="start">go to data/workflow-log.md,</text>
+<text x="904" y="1222" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="17.5" font-weight="500" fill="#14202B" text-anchor="start">one line each. Never to</text>
+<text x="904" y="1246" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="17.5" font-weight="500" fill="#14202B" text-anchor="start">your phone.</text>
+<rect x="1220" y="410" width="312" height="845" rx="16" fill="#FFFFFF" stroke="#D5DBD6" stroke-width="2"/>
+<text x="1248" y="456" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="15" font-weight="500" fill="#1C8C5E" text-anchor="start" letter-spacing="1.5">AGENTS KEEP IT GROWING</text>
+<path d="M 1256 510 V 1180" stroke="#1C8C5E" stroke-width="8" stroke-linecap="round"/>
+<path d="M 1290 850 V 1180" stroke="#1C8C5E" stroke-width="8" stroke-linecap="round"/>
+<circle cx="1256" cy="510" r="15" fill="#FFFFFF" stroke="#1C8C5E" stroke-width="6"/>
+<text x="1314" y="517" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="700" fill="#14202B" text-anchor="start">A board breaks</text>
+<text x="1314" y="541" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#56636D" text-anchor="start">or goes quiet</text>
+<text x="1314" y="561" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#56636D" text-anchor="start">3 runs in a row</text>
+<circle cx="1256" cy="620" r="15" fill="#FFFFFF" stroke="#1C8C5E" stroke-width="6"/>
+<text x="1314" y="627" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="700" fill="#14202B" text-anchor="start">Repair agent</text>
+<text x="1314" y="651" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#56636D" text-anchor="start">investigates the board</text>
+<text x="1314" y="671" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#56636D" text-anchor="start">with web access</text>
+<circle cx="1256" cy="730" r="15" fill="#FFFFFF" stroke="#1C8C5E" stroke-width="6"/>
+<text x="1314" y="737" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="700" fill="#14202B" text-anchor="start">Proposes a fix</text>
+<text x="1314" y="761" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#56636D" text-anchor="start">it can't edit code</text>
+<text x="1314" y="781" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#56636D" text-anchor="start">or data</text>
+<circle cx="1290" cy="850" r="15" fill="#FFFFFF" stroke="#1C8C5E" stroke-width="6"/>
+<text x="1314" y="857" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="700" fill="#14202B" text-anchor="start">Once a week</text>
+<text x="1314" y="881" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#56636D" text-anchor="start">on the day you set,</text>
+<text x="1314" y="901" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#56636D" text-anchor="start">if you turn it on</text>
+<circle cx="1290" cy="940" r="15" fill="#FFFFFF" stroke="#1C8C5E" stroke-width="6"/>
+<text x="1314" y="947" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="700" fill="#14202B" text-anchor="start">Scout agent</text>
+<text x="1314" y="971" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#56636D" text-anchor="start">finds companies that</text>
+<text x="1314" y="991" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#56636D" text-anchor="start">fit your profile</text>
+<circle cx="1290" cy="1050" r="15" fill="#FFFFFF" stroke="#1C8C5E" stroke-width="6"/>
+<text x="1314" y="1057" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="700" fill="#14202B" text-anchor="start">Proposes companies</text>
+<text x="1314" y="1081" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#56636D" text-anchor="start">each job board</text>
+<text x="1314" y="1101" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#56636D" text-anchor="start">checked and readable</text>
+<rect x="1232" y="1158" width="82" height="44" rx="22" fill="#14202B"/>
+<rect x="1244" y="1170" width="58" height="20" rx="10" fill="#FFFFFF"/>
+<text x="1320" y="1176" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="700" fill="#14202B" text-anchor="start">You approve</text>
+<text x="1320" y="1200" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#56636D" text-anchor="start">then Claude applies it</text>
+<path d="M 1220 422 H 470 V 450" fill="none" stroke="#1C8C5E" stroke-width="5" stroke-dasharray="12 9" marker-end="url(#arrowGreen)"/>
+<text x="660" y="410" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="17" font-weight="500" fill="#1C8C5E" text-anchor="middle">approved fixes and new companies feed the hourly pull</text>
+<line x1="100" y1="1332" x2="1500" y2="1332" stroke="#D5DBD6" stroke-width="2"/>
+<rect x="103" y="1363" width="34" height="34" rx="5" fill="#FFFFFF" stroke="#2457D6" stroke-width="6"/>
+<text x="156" y="1387" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">Code: fixed steps, always the same</text>
+<circle cx="590" cy="1380" r="19" fill="#FFFFFF" stroke="#D9822B" stroke-width="7"/>
+<circle cx="590" cy="1380" r="6" fill="#D9822B"/>
+<text x="626" y="1387" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">Claude skill: language and judgment</text>
+<circle cx="1060" cy="1380" r="15" fill="#FFFFFF" stroke="#1C8C5E" stroke-width="6"/>
+<text x="1096" y="1387" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">Agent: open-ended, proposals only</text>
+<circle cx="120" cy="1432" r="22" fill="#14202B"/>
+<circle cx="120" cy="1432" r="12" fill="#FFFFFF"/>
+<text x="156" y="1439" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">You: every approval and every send</text>
+<rect x="566" y="1421" width="48" height="22" rx="11" fill="#FFFFFF" stroke="#14202B" stroke-width="1.5"/>
+<text x="590" y="1436" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="12" font-weight="500" fill="#14202B" text-anchor="middle" letter-spacing="1">MAC</text>
+<text x="626" y="1439" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">Mac-only: needs a Mac app</text>
+<text x="100" y="1540" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="34" font-weight="800" fill="#14202B" text-anchor="start">Built to run unattended</text>
+<rect x="100" y="1574" width="462" height="46" rx="23" fill="#FFFFFF" stroke="#D5DBD6" stroke-width="2"/>
+<text x="331.0" y="1604" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="18" font-weight="500" fill="#14202B" text-anchor="middle">Each Claude step writes only its named files</text>
+<rect x="576" y="1574" width="328" height="46" rx="23" fill="#FFFFFF" stroke="#D5DBD6" stroke-width="2"/>
+<text x="740.0" y="1604" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="18" font-weight="500" fill="#14202B" text-anchor="middle">Dollar cap on every Claude run</text>
+<rect x="918" y="1574" width="270" height="46" rx="23" fill="#FFFFFF" stroke="#D5DBD6" stroke-width="2"/>
+<text x="1053.0" y="1604" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="18" font-weight="500" fill="#14202B" text-anchor="middle">Code checks every resume</text>
+<rect x="100" y="1636" width="366" height="46" rx="23" fill="#FFFFFF" stroke="#D5DBD6" stroke-width="2"/>
+<text x="283.0" y="1666" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="18" font-weight="500" fill="#14202B" text-anchor="middle">Every claim quoted from your files</text>
+<rect x="480" y="1636" width="270" height="46" rx="23" fill="#FFFFFF" stroke="#D5DBD6" stroke-width="2"/>
+<text x="615.0" y="1666" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="18" font-weight="500" fill="#14202B" text-anchor="middle">Quotes confirmed by code</text>
+<rect x="764" y="1636" width="212" height="46" rx="23" fill="#FFFFFF" stroke="#D5DBD6" stroke-width="2"/>
+<text x="870.0" y="1666" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="18" font-weight="500" fill="#14202B" text-anchor="middle">Nothing sent twice</text>
+<rect x="990" y="1636" width="203" height="46" rx="23" fill="#FFFFFF" stroke="#D5DBD6" stroke-width="2"/>
+<text x="1091.5" y="1666" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="18" font-weight="500" fill="#14202B" text-anchor="middle">One run at a time</text>
+<rect x="100" y="1698" width="366" height="46" rx="23" fill="#FFFFFF" stroke="#D5DBD6" stroke-width="2"/>
+<text x="283.0" y="1728" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="18" font-weight="500" fill="#14202B" text-anchor="middle">Every run saved to a local history</text>
+<rect x="480" y="1698" width="404" height="46" rx="23" fill="#FFFFFF" stroke="#D5DBD6" stroke-width="2"/>
+<text x="682.0" y="1728" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="18" font-weight="500" fill="#14202B" text-anchor="middle">Alerts go to the log, never your phone</text>
+<rect x="898" y="1698" width="424" height="46" rx="23" fill="#FFFFFF" stroke="#D5DBD6" stroke-width="2"/>
+<text x="1110.0" y="1728" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="18" font-weight="500" fill="#14202B" text-anchor="middle">Notifications off until you turn them on</text>
+<rect x="100" y="1760" width="347" height="46" rx="23" fill="#FFFFFF" stroke="#D5DBD6" stroke-width="2"/>
+<text x="273.5" y="1790" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="18" font-weight="500" fill="#14202B" text-anchor="middle">417 tests + 5 fact-checker evals</text>
+<text x="100" y="1890" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="34" font-weight="800" fill="#14202B" text-anchor="start">What's in the repo</text>
+<text x="100" y="1940" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="15" font-weight="500" fill="#D9822B" text-anchor="start" letter-spacing="1.5">6 SKILLS THE RUN USES</text>
+<text x="100" y="1978" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">tailor-resume</text>
+<text x="100" y="2008" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">check-resume</text>
+<text x="100" y="2038" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">update-competencies</text>
+<text x="100" y="2068" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">import-jobs</text>
+<text x="100" y="2098" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">diagnose-board</text>
+<text x="100" y="2128" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">scout-companies</text>
+<text x="450" y="1940" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="15" font-weight="500" fill="#D9822B" text-anchor="start" letter-spacing="1.5">4 SKILLS YOU RUN</text>
+<text x="450" y="1978" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">setup</text>
+<text x="450" y="2008" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">research-resume-rules</text>
+<text x="450" y="2038" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">craft-stories</text>
+<text x="450" y="2068" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">interview-prep</text>
+<text x="800" y="1940" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="15" font-weight="500" fill="#2457D6" text-anchor="start" letter-spacing="1.5">THE SCRIPTS</text>
+<text x="800" y="1978" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">scripts/job-pull.mjs</text>
+<text x="800" y="2008" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" font-weight="400" fill="#14202B" text-anchor="start">checked, capped Claude runs</text>
+<text x="800" y="2038" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" font-weight="400" fill="#14202B" text-anchor="start">writer + fact-checker loop</text>
+<text x="800" y="2068" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" font-weight="400" fill="#14202B" text-anchor="start">title, place and pay rules</text>
+<text x="800" y="2098" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" font-weight="400" fill="#14202B" text-anchor="start">Word builder and notifications</text>
+<text x="800" y="2128" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">tests/ and evals/</text>
+<text x="1150" y="1940" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="15" font-weight="500" fill="#1C8C5E" text-anchor="start" letter-spacing="1.5">BRING YOUR OWN</text>
+<text x="1150" y="1978" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">config/preferences.json</text>
+<text x="1150" y="2008" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">profile/profile.md</text>
+<text x="1150" y="2038" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">profile/stories.md</text>
+<text x="1150" y="2068" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="500" fill="#14202B" text-anchor="start">profile/resume-rules.md</text>
+<text x="1150" y="2098" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" font-weight="400" fill="#14202B" text-anchor="start">a Word template, if you like</text>
+<line x1="100" y1="2180" x2="1500" y2="2180" stroke="#D5DBD6" stroke-width="2"/>
+<text x="100" y="2218" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#56636D" text-anchor="start">Mac-only parts: launchd schedule · Messages · Mail · Numbers · Pages. The rest is Node 20 and Claude Code.</text>
+</svg>

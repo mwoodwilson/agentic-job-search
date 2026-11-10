@@ -1,0 +1,1 @@
+{"name":"agentic-job-search","version":"1.0.0","private":true,"license":"MIT","engines":{"node":">=20"},"scripts":{"test":"node --test","check":"node scripts/check-setup.mjs","pull":"node scripts/job-pull.mjs"}}

@@ -1,0 +1,45 @@
+{
+  "_about": "Jordan Reyes's settings (a made-up person). Same shape as config/preferences.example.json, filled in. Notifications and the schedule are off. The companies are real public job boards; roles open and close, so a board can show no match on a given day.",
+  "candidate": {
+    "name": "Jordan Reyes",
+    "contact": "jordan@example.com · (555) 010-0199 · Chicago, IL"
+  },
+  "search": {
+    "companies": [
+      { "name": "Asana", "ats": "greenhouse", "slug": "asana" },
+      { "name": "Lyft", "ats": "greenhouse", "slug": "lyft" },
+      { "name": "Spotify", "ats": "lever", "slug": "spotify" },
+      { "name": "Ramp", "ats": "ashby", "slug": "ramp" }
+    ],
+    "titleKeywords": ["product manager"],
+    "titleExclude": ["intern", "associate"],
+    "locationKeywords": ["remote", "chicago", "new york"],
+    "usOnly": true,
+    "pay": { "minTop": 0, "minBaseTop": 0 },
+    "families": [{ "name": "Product Manager", "titleKeywords": ["product manager"] }]
+  },
+  "resume": {
+    "template": "templates/resume-template.docx",
+    "roles": [
+      { "title": "Senior Product Manager", "companyLine": "Larkfield Commerce (Chicago, IL) · March 2023 – Present", "minBullets": 4 },
+      { "title": "Product Manager", "companyLine": "Wrenfield Health (Chicago, IL) · June 2020 – February 2023", "minBullets": 3 },
+      { "title": "Associate Product Manager", "companyLine": "Penhallow Media (New York, NY) · July 2017 – May 2020", "minBullets": 2 }
+    ],
+    "maxBullets": 5,
+    "note": "",
+    "banned": [
+      { "pattern": "\\bleverag(e|ed|es|ing)\\b", "why": "Buzzword. Say \"used\", or name what you actually did." },
+      { "pattern": "\\b(helped|worked on)\\b", "why": "Too vague about your part. Say what you did yourself." }
+    ]
+  },
+  "notifications": {
+    "imessage": { "enabled": false, "to": "" },
+    "email": { "enabled": false, "to": "" },
+    "numbers": { "enabled": false }
+  },
+  "schedule": {
+    "hourly": false,
+    "scout": { "enabled": false, "day": "Monday", "hour": 9 }
+  },
+  "claude": { "maxUsdPerStep": 3, "maxUsdScout": 5 }
+}

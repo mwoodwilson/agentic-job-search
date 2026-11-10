@@ -1,0 +1,44 @@
+[
+  {
+    "name": "jordan-final",
+    "expect": "pass",
+    "file": "tests/fixtures/jordan-final.md",
+    "plants": "Nothing. The finalized resume is true, so every line must be supported by a quote from Jordan's profile and stories, never from the resume itself."
+  },
+  {
+    "name": "changed-number",
+    "expect": "flag",
+    "file": "examples/evals/changed-number.md",
+    "plants": "One number changed: the no-show rate fell from 18%, written as 28%.",
+    "mustFlag": [
+      "Launched text reminders across 120 clinics, cutting the no-show rate from 28% to 11% within 6 months."
+    ]
+  },
+  {
+    "name": "inflated-ownership",
+    "expect": "flag",
+    "file": "examples/evals/inflated-ownership.md",
+    "plants": "\"Partnered with payments engineering\" became \"Led payments engineering\".",
+    "mustFlag": [
+      "Led payments engineering on smart retries for soft-declined cards, raising authorization rate from 88.4% to 90.9% and recovering an estimated $4.2M in annual merchant sales."
+    ]
+  },
+  {
+    "name": "wrong-role",
+    "expect": "flag",
+    "file": "examples/evals/wrong-role.md",
+    "plants": "The digital wallets launch, which belongs to the Senior Product Manager job, moved into the Product Manager job at Wrenfield Health.",
+    "mustFlag": [
+      "Rolled out Apple Pay and other digital wallets, training 40 support and sales reps; wallets reached 27% of mobile orders within 2 months."
+    ]
+  },
+  {
+    "name": "keyword-list-summary",
+    "expect": "flag",
+    "file": "examples/evals/keyword-list-summary.md",
+    "plants": "One summary sentence rewritten as a string of keywords. Every word in it is a true skill; the sentence says nothing Jordan did.",
+    "mustFlag": [
+      "Checkout and payments, conversion, A/B testing, funnel analysis, product roadmaps, cross-functional launches, enablement, KPI reporting."
+    ]
+  }
+]

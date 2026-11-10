@@ -1,0 +1,100 @@
+{
+  "link": "https://example.com/jobs/saltmere-senior-pm-checkout",
+  "bullets": [
+    {
+      "text": "Senior Product Manager with 9 years in product, the last 6 in checkout, payments and patient billing.",
+      "verdict": "supported",
+      "source_file": "profile/profile.md",
+      "source_quote": "The last 6 (June 2020 to now) have been in patient scheduling and billing, and in checkout and payments.",
+      "issue": ""
+    },
+    {
+      "text": "Talks to merchants weekly, finds where shoppers drop off in the funnel and proves the lift with A/B tests.",
+      "verdict": "supported",
+      "source_file": "profile/profile.md",
+      "source_quote": "I find the drop-off in the data, test fixes with engineers and designers, and prove the lift with numbers.",
+      "issue": ""
+    },
+    {
+      "text": "Replaced Larkfield's three-step checkout with one page, raising completion from 61.0% to 66.8% within 3 months.",
+      "verdict": "supported",
+      "source_file": "profile/profile.md",
+      "source_quote": "checkout completion rose from 61.0% to 66.8% (+5.8 points) within 3 months of the full rollout in August 2024",
+      "issue": ""
+    },
+    {
+      "text": "Replaced the three-step hosted checkout with one page after SQL funnel analysis found the worst drop-off; completion rose from 61.0% to 66.8% within 3 months (est. +$31M annualized merchant sales).",
+      "verdict": "supported",
+      "source_file": "profile/profile.md",
+      "source_quote": "checkout completion rose from 61.0% to 66.8% (+5.8 points) within 3 months of the full rollout in August 2024. Finance estimated +$31M in annualized merchant sales.",
+      "issue": ""
+    },
+    {
+      "text": "Ran weekly A/B test reviews with data science and engineering for 38,000 ecommerce merchants: 46 tests in 2025, 19 shipped winners, and mobile checkout conversion up 12% YoY.",
+      "verdict": "supported",
+      "source_file": "profile/profile.md",
+      "source_quote": "46 A/B tests run in 2025 and 19 shipped as winners. Mobile checkout conversion was up 12% YoY",
+      "issue": ""
+    },
+    {
+      "text": "Cut failed payments via smart-retry rules for soft-declined cards with payments engineering, lifting payment success: authorization rate 88.4% to 90.9% since Q1 2025 (est. $4.2M/yr recovered).",
+      "verdict": "supported",
+      "source_file": "profile/profile.md",
+      "source_quote": "Smart retries: authorization rate rose from 88.4% to 90.9% (+2.5 points) since Q1 2025. Finance estimated $4.2M in annual merchant sales recovered.",
+      "issue": ""
+    },
+    {
+      "text": "Wrote the PRD for the embeddable payment form API with developer relations; 1,900 merchants integrated since its Q2 2025 launch, with median integration time cut from 11 to 3 days.",
+      "verdict": "supported",
+      "source_file": "profile/profile.md",
+      "source_quote": "1,900 merchants integrated since Q2 2025. Median integration time was 3 days, down from 11 days on the old API.",
+      "issue": ""
+    },
+    {
+      "text": "Launched digital wallets incl. Apple Pay on the hosted checkout page in April 2024, writing a launch plan and enablement for 40 sales and support reps; wallets hit 27% of mobile orders in 2 months.",
+      "verdict": "supported",
+      "source_file": "profile/profile.md",
+      "source_quote": "Wallets were 27% of mobile orders within 2 months of launch. I wrote the launch plan and the enablement, and trained 40 support and sales reps.",
+      "issue": ""
+    },
+    {
+      "text": "Found via SQL and Looker analytics that 41% of patients quit booking at the insurance step; redesigned it with card scan and a skip option, cutting drop-off to 27% within 3 months of launch.",
+      "verdict": "supported",
+      "source_file": "profile/profile.md",
+      "source_quote": "After the insurance card scan redesign (March 2021), drop-off at that step fell from 41% to 27% within 3 months.",
+      "issue": ""
+    },
+    {
+      "text": "Launched online bill pay across 120 clinics in 2022; patients paying their balance online rose from 12% to 38% within 4 months, and clinics processed $14M through it that year.",
+      "verdict": "supported",
+      "source_file": "profile/profile.md",
+      "source_quote": "Patients paying their balance online rose from 12% to 38% within 4 months. Clinics processed $14M through it in 2022.",
+      "issue": ""
+    },
+    {
+      "text": "Wrote 9 PRDs for the 2022 roadmap, which spanned 3 teams (scheduling, billing, notifications), drawing on 60 patient and clinic-staff interviews in 2021.",
+      "verdict": "supported",
+      "source_file": "profile/profile.md",
+      "source_quote": "60 patient and clinic-staff interviews in 2021. 9 PRDs written for the 2022 roadmap.",
+      "issue": ""
+    },
+    {
+      "text": "Ran the metered paywall test in 2018, lifting new subscription starts 19%, from 3,100 to 3,690 per month.",
+      "verdict": "supported",
+      "source_file": "profile/profile.md",
+      "source_quote": "Metered paywall test (2018): new subscription starts rose 19%, from 3,100 to 3,690 per month.",
+      "issue": ""
+    },
+    {
+      "text": "Grew the newsletter from 410,000 to 640,000 subscribers in 2019 by testing 14 signup placements with 4 engineers and 2 designers.",
+      "verdict": "supported",
+      "source_file": "profile/stories.md",
+      "source_quote": "Newsletter subscribers at Penhallow went from 410,000 to 640,000 in 2019. I tested 14 signup placements with 4 engineers and 2 designers.",
+      "issue": ""
+    }
+  ],
+  "keywords": [
+    { "keyword": "KPIs", "found": true, "resume_quote": "KPI Reporting" },
+    { "keyword": "analytics tools", "found": true, "resume_quote": "SQL and Looker analytics" }
+  ]
+}
