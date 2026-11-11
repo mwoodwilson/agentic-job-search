@@ -17,36 +17,51 @@ An hourly job-search pipeline for Mac and Claude Code. It watches the job boards
 ```mermaid
 flowchart TD
     pull["Hourly pull<br/>public company job boards"] --> filters["Filters<br/>title, place, pay"]
-    filters --> list["Job list and archives<br/>data/jobs.csv, archives/"]
-    inbox["Optional inbox<br/>inbox.md, from you or another agent"] --> list
-    list --> writer["Writer agent<br/>tailor-resume, up to 3 roles at once"]
-    writer --> code["Code checks<br/>5 of the 6 hard rules"]
-    writer -->|"under 70% true keyword match"| could["Could not tailor<br/>nothing is stretched"]
-    code -->|"rules pass"| checker["Fact-checker agent<br/>a separate Claude run"]
-    checker --> quotes["Quotes verified by code<br/>hard rule 5: each quote must be in your files"]
-    code -->|"rule broken"| tries
-    quotes -->|"stretched or unsupported line"| tries{"Tries left?<br/>up to 3 tries"}
-    tries -->|"yes, revise"| writer
-    tries -->|"no"| review["Needs review<br/>held for you, with reasons"]
-    quotes -->|"every line supported"| files["Resume ready<br/>Word + PDF, one page"]
-    files --> notify["Notifications, if on<br/>sent as soon as it passes, with the job link"]
-    list -.->|"new roles, right away"| sheet["Notifications, if on<br/>new-roles line, Numbers sheet"]
+    filters --> list["Job list and archives"]
+    inbox["Optional inbox<br/>roles you or an agent add"] --> list
+    list -.->|"if on"| sheet["Notifications<br/>new-roles line, Numbers sheet"]
+    list --> writer["Writer agent<br/>up to 3 roles at once"]
+    writer -->|"under 70% true<br/>keyword match"| could["Could not tailor<br/>nothing is stretched"]
+    writer --> checks
 
-    pull -.->|"a board breaks 3 runs in a row"| repair["Repair agent<br/>diagnose-board"]
-    scout["Scout agent, weekly<br/>scout-companies"] -.-> proposals["Proposals only<br/>data/proposals/"]
-    repair -.-> proposals
+    subgraph checks["Checks, up to 3 tries"]
+        direction LR
+        code["Code checks<br/>5 of the 6 hard rules"] --> checker["Fact-checker agent<br/>quotes your files"] --> quotes["Quotes verified by code<br/>hard rule 5"]
+    end
+
+    checks -->|"a check fails: revise"| writer
+    checks -->|"all pass"| ready["Resume ready<br/>Word + PDF, one page"]
+    checks -->|"fails after 3 tries"| review["Needs review<br/>held for you, with reasons"]
+    ready -->|"if on"| send["Notifications<br/>resume and job link, right away"]
 
     classDef agent fill:#dbeafe,stroke:#2563eb,color:#111
     classDef plain fill:#f3f4f6,stroke:#6b7280,color:#111
     classDef good fill:#dcfce7,stroke:#16a34a,color:#111
     classDef held fill:#fef3c7,stroke:#d97706,color:#111
-    class writer,checker,repair,scout agent
-    class pull,filters,list,inbox,code,quotes,tries,notify,sheet,proposals plain
-    class files good
+    class writer,checker agent
+    class pull,filters,list,inbox,code,quotes,send,sheet plain
+    class ready good
     class could,review held
+    style checks fill:#ffffff,stroke:#9ca3af
 ```
 
-Blue boxes are Claude agents, grey boxes are plain code. Each role ends in one of three states: **Resume ready**, **Needs review** (held for you, with the reasons) or **Could not tailor** (the job asks for more than your true experience covers, so nothing is stretched). The repair agent and the weekly scout only write proposals. Nothing they suggest is applied until you say yes.
+Blue boxes are Claude agents, grey boxes are plain code. Each role ends in one of three states: **Resume ready**, **Needs review** (held for you, with the reasons) or **Could not tailor** (the job asks for more than your true experience covers, so nothing is stretched).
+
+Two more agents work on the side. They only write proposals, and nothing they suggest is applied until you say yes.
+
+```mermaid
+flowchart LR
+    broken["A board breaks<br/>3 runs in a row"] --> repair["Repair agent<br/>diagnose-board"]
+    weekly["Once a week"] --> scout["Scout agent<br/>scout-companies"]
+    repair --> proposals["Proposals only<br/>data/proposals/"]
+    scout --> proposals
+    proposals -->|"you say yes"| applied["Change applied"]
+
+    classDef agent fill:#dbeafe,stroke:#2563eb,color:#111
+    classDef plain fill:#f3f4f6,stroke:#6b7280,color:#111
+    class repair,scout agent
+    class broken,weekly,proposals,applied plain
+```
 
 Read next: [Setup](docs/SETUP.md), [Architecture](docs/ARCHITECTURE.md), [Customizing](docs/CUSTOMIZING.md), [the made-up example person](examples/README.md) and [the evals](evals/README.md).
 

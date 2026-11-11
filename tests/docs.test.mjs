@@ -115,8 +115,9 @@ test("the README has the flow diagram, the poster and the sections the reader ex
   assert.deepEqual([...at].sort((a, b) => a - b), at, "sections are in the order of the design");
 });
 
-test("the flow diagram shows every stage, with its labels in quotes so GitHub can draw it", () => {
-  const block = README().match(/^```mermaid\n([\s\S]*?)^```/m)?.[1] ?? "";
+// The pipeline chart and the side-agents chart are read together.
+test("the flow diagrams show every stage, with their labels in quotes so GitHub can draw them", () => {
+  const block = [...README().matchAll(/^```mermaid\n([\s\S]*?)^```/gm)].map((m) => m[1]).join("\n");
   assert.match(block, /^flowchart /m);
   for (const stage of [/hourly pull/i, /filters/i, /job list/i, /archives/i, /inbox/i, /writer/i, /code checks/i, /fact-check/i, /verified by code/i,
     /3 tries/i, /word \+ pdf/i, /notifications/i, /repair/i, /scout/i, /proposals/i, /5 of the 6 hard rules/i, /hard rule 5/i]) {
