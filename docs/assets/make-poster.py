@@ -14,7 +14,7 @@ import tempfile
 from pathlib import Path
 from xml.sax.saxutils import escape as esc
 
-TESTS = 417   # from `node --test`
+TESTS = 462   # from `node --test`
 EVALS = 5     # the fact-checker cases in evals/
 
 OUT = Path(__file__).resolve().parent
@@ -87,9 +87,9 @@ add(f'<path d="M 470 {y2+24} V {y2+150}" stroke="{C["red"]}" stroke-width="7" st
 # ---------- stations on the hourly run ----------
 row1 = [(200, "code", "Every hour", ["launchd starts the run", "on your Mac"]),
         (470, "code", "Pull job boards", ["Greenhouse · Lever · Ashby", "Gem · Workday"]),
-        (740, "code", "Filter and dedupe", ["title · place · pay floor", "no role listed twice"]),
+        (740, "code", "Filter and dedupe", ["title · place (remote in text) · pay", "no repost twice; new req ID kept"]),
         (1010, "code", "List the role", ["data/jobs.csv + the full", "description in archives/"])]
-row2 = [(1010, "claude", "Write the resume", ["writer: tailor-resume", "one role per run"]),
+row2 = [(1010, "claude", "Write the resume", ["writer: tailor-resume", "up to 3 roles at once"]),
         (740, "code", "Code checks", ["5 of the 6 hard rules", "+ your own rules"]),
         (240, "code", "Build Word + PDF", ["one page, in your template", "PDF is made by Pages"])]
 row3 = [(400, "code", "Notify, if turned on", ["text · email · Numbers sheet", "never sent twice"]),

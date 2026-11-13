@@ -96,16 +96,42 @@ const NON_US = /\b(uk|united kingdom|england|canada|london|toronto|vancouver|mon
 const US = /\b(us|usa|u\.s\.?|united states|new york|nyc)\b/i;
 const inUS = (location) => !NON_US.test(String(location ?? "")) || US.test(String(location ?? ""));
 
+// A remote offer in the description counts as a remote location, for boards whose location field names only an
+// office city. Any sentence ruling remote out wins, and with usOnly a non-US location still drops the role.
+const REMOTE_OFFER = /\b(fully[- ]remote|remote[- ](friendly|eligible|option)|work(ing)? remotely|open to remote|(can|may) be (fully )?remote|remote (or|and) (a )?(hybrid|in[- ]office|on[- ]?site|in our)|(hybrid|in[- ]office|on[- ]?site),? (or|and) (fully )?remote|remote within the (us|u\.s\.|united states)|remote \((us|usa|u\.s\.|united states)\)|(role|position) is remote)/i;
+const REMOTE_RULED_OUT = /\b(not (a )?remote|no remote|not (eligible|open|available) (for|to) remote|remote (work )?is not|isn'?t remote|non-remote)\b/i;
+const remoteInDescription = (text) => REMOTE_OFFER.test(String(text ?? "")) && !REMOTE_RULED_OUT.test(String(text ?? ""));
+// Adds "Remote" to the location shown in the job list when only the description offers it.
+const noteRemote = (j) =>
+  !matches(j.location, ["remote"]) && remoteInDescription(j.description)
+    ? { ...j, location: unique([j.location, "Remote"]).join(" | ") }
+    : j;
+
+// A company entry's optional "titles" narrows that one company to these title words, on top of titleKeywords.
+const companyTitles = (j, search) =>
+  (search.companies ?? []).find((c) => lc(c.name) === lc(j.company))?.titles ?? [];
+
 function passesFilters(j, search = settings.search) {
   return matches(j.title, search.titleKeywords ?? []) &&
+    matches(j.title, companyTitles(j, search)) &&
     !excluded(j.title, search.titleExclude ?? []) &&
-    matches(j.location, search.locationKeywords ?? []) &&
+    (matches(j.location, search.locationKeywords ?? []) || remoteInDescription(j.description)) &&
     (search.usOnly === false || inUS(j.primaryLocation || j.location));
 }
 
 // Same company + title = same role, even when it arrives under a different link (e.g. a repost on another site).
 const roleKeyOf = (company, title) =>
   `${lc(company).replace(/,?\s*(inc\.?|llc|ltd\.?|corp\.?)$/, "").replace(/[^a-z0-9]+/g, " ").trim()}|${lc(title).replace(/[^a-z0-9]+/g, " ").trim()}`;
+// ...unless both links carry different requisition IDs (e.g. R-282280 and R-294191): some companies post the same
+// title for separate openings. Links that differ only in case are the same role.
+const reqIdOf = (url) => String(url ?? "").match(/(?:^|[^a-z0-9])(r-?\d{5,})/i)?.[1].replace("-", "").toLowerCase() ?? "";
+const sameRolePosting = (a, b) => {
+  const ia = reqIdOf(a), ib = reqIdOf(b);
+  return !(ia && ib && ia !== ib);
+};
+// key → links already listed under that company + title.
+const addKeyLink = (map, key, url) => map.set(key, [...(map.get(key) ?? []), url]);
+const isListedRepost = (map, key, url) => (map.get(key) ?? []).some((u) => sameRolePosting(u, url));
 
 
 // Largest figure in a pay string, e.g. "$239K - $325K", "232,000–282,000 USD" or "$1.2M". Null if none.
@@ -1236,13 +1262,14 @@ async function importInbox(seen, today, stamp) {
   const list = Array.isArray(raw) ? raw : [];
   const rowsNow = csvRows(await readFile(CSV_FILE, "utf8").catch(() => ""));
   const inCsv = new Set(Object.keys(rowsNow));
-  const inCsvKeys = new Set(Object.values(rowsNow).map((r) => roleKeyOf(r.company, r.title)));
+  const inCsvKeys = new Map();
+  for (const [link, r] of Object.entries(rowsNow)) addKeyLink(inCsvKeys, roleKeyOf(r.company, r.title), link);
   const jobs = [];
   let duplicates = 0;
   for (const e of list) {
     const url = String(e.url || e.link || "").trim();
     // Same link, or same company + title under another link (e.g. a job site vs the careers site) = already listed.
-    if (!url || inCsv.has(url) || inCsvKeys.has(roleKeyOf(e.company, e.title)) || jobs.some((j) => j.url === url)) { duplicates++; continue; }
+    if (!url || inCsv.has(url) || isListedRepost(inCsvKeys, roleKeyOf(e.company, e.title), url) || jobs.some((j) => j.url === url)) { duplicates++; continue; }
     const j = {
       company: e.company || "", title: e.title || "", location: e.location || "", team: e.team || "",
       pay: e.pay || "", posted: e.posted || "", url, description: e.description || "", source: "Inbox",
@@ -1370,7 +1397,7 @@ async function pullCompanies(companies, { known = new Set(), seen = {}, fetchBoa
       log(`✗ ${c.name}: board not found. Check the slug "${c.slug}" in its careers URL.`);
       boardAlert(record(c.name, { error: `board not found (slug "${c.slug}")` }), c);
     } else {
-      const hits = board.jobs.filter((j) => passesFilters(j));
+      const hits = board.jobs.map(noteRemote).filter((j) => passesFilters(j));
       kept.push(...hits);
       readOk.push(c);
       log(`✓ ${c.name}: ${hits.length} match (of ${board.open} open)`);
@@ -1435,12 +1462,13 @@ async function main() {
   // One row per posting, only postings not seen on an earlier run, then the pay rule.
   // Roles that fail the pay rule are dropped.
   // A role already in jobs.csv under another link (same company + title) also counts as seen.
-  const listedKeys = new Set(Object.values(csvRows(await readFile(CSV_FILE, "utf8").catch(() => ""))).map((r) => roleKeyOf(r.company, r.title)));
+  const listedKeys = new Map();
+  for (const [link, r] of Object.entries(csvRows(await readFile(CSV_FILE, "utf8").catch(() => "")))) addKeyLink(listedKeys, roleKeyOf(r.company, r.title), link);
   const fresh = new Map();
   for (const j of kept) {
     const key = roleKeyOf(j.company, j.title);
-    if (!j.url || seenBefore.has(j.url) || fresh.has(j.url) || listedKeys.has(key)) continue;
-    listedKeys.add(key);
+    if (!j.url || seenBefore.has(j.url) || fresh.has(j.url) || isListedRepost(listedKeys, key, j.url)) continue;
+    addKeyLink(listedKeys, key, j.url);
     fresh.set(j.url, j);
   }
   const afterPay = [];
@@ -1526,7 +1554,7 @@ if (isMain(import.meta.url)) {
 }
 
 export {
-  useSettings, pullCompanies, landingStatus, passesFilters, compStatus, archiveFor, orderJobsCsv, extractAshbyPostings, fetchCompany, runPlan, ensureInbox,
+  useSettings, pullCompanies, landingStatus, passesFilters, noteRemote, sameRolePosting, compStatus, archiveFor, orderJobsCsv, extractAshbyPostings, fetchCompany, runPlan, ensureInbox,
   notifyTargets, notifyNews, notifyResume, notifyNothing, numbersOnly, unsentAlert, NO_MATCHES, SHEET_UPDATED, SHEET_OFF, payMax, workdayPay, workdayListBody, fetchWorkday, ashbyJobs, ashbyUrl, runSummary, rolesMessage, resumeMessage, resumePlainText,
   CSV_FILE, TAILORED_FILE, readSources, writerFiles, checkerFiles, jobSection,
 };

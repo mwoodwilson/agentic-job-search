@@ -16,9 +16,10 @@ An hourly job-search pipeline for Mac and Claude Code. It watches the job boards
 
 ```mermaid
 flowchart TD
-    pull["Hourly pull<br/>public company job boards"] --> filters["Filters<br/>title, place, pay"]
-    filters --> list["Job list and archives"]
-    inbox["Optional inbox<br/>roles you or an agent add"] --> list
+    pull["Hourly pull<br/>public company job boards"] --> filters["Filters<br/>title (per company too), place<br/>(remote offered in description counts), pay"]
+    filters --> dedup["Already listed?<br/>same link, or same company + title<br/>(different requisition IDs = new role)"]
+    dedup -->|"new"| list["Job list and archives"]
+    inbox["Optional inbox<br/>roles you or an agent add"] --> dedup
     list -.->|"if on"| sheet["Notifications<br/>new-roles line, Numbers sheet"]
     list --> writer["Writer agent<br/>up to 3 roles at once"]
     writer -->|"under 70% true<br/>keyword match"| could["Could not tailor<br/>nothing is stretched"]
@@ -39,7 +40,7 @@ flowchart TD
     classDef good fill:#dcfce7,stroke:#16a34a,color:#111
     classDef held fill:#fef3c7,stroke:#d97706,color:#111
     class writer,checker agent
-    class pull,filters,list,inbox,code,quotes,send,sheet plain
+    class pull,filters,dedup,list,inbox,code,quotes,send,sheet plain
     class ready good
     class could,review held
     style checks fill:#ffffff,stroke:#9ca3af
@@ -74,7 +75,7 @@ Read next: [Setup](docs/SETUP.md), [Architecture](docs/ARCHITECTURE.md), [Custom
 - **Limited file access and dollar caps.** Every Claude step runs by itself. It can read files only inside the project folder and write only the one or two files it is named for, and it can't run shell commands. Only the repair agent (which can also open web pages) and the scout (which can also search the web and open pages) reach the internet. Each step has a dollar cap and a 20-minute time limit, and the writer can write only its own role's draft, never another resume.
 - **Evals that grow from real failures.** The fact-checker is tested on a true resume and on copies with one planted problem each: a changed number, inflated ownership, work moved to the wrong role, a summary that is a list of keywords. Every real failure becomes a new case before it is fixed. How it works and what each case caught: [docs/EVALS.md](docs/EVALS.md).
 - **Nothing is sent twice.** A log of what was sent, kept per resume version, means a rerun or a crash never sends the same resume twice, while a changed resume does go out again. Only one run happens at a time, and every run is saved to a local history you can undo.
-- **Tests.** 445 automatic tests (`node --test`) cover the checks, the writer loop, the messages and the settings. They use only the made-up example person and make no Claude calls.
+- **Tests.** 462 automatic tests (`node --test`) cover the checks, the writer loop, the messages and the settings. They use only the made-up example person and make no Claude calls.
 
 ## Quick start
 
@@ -102,6 +103,7 @@ Everyday commands:
 | `node scripts/job-pull.mjs` | One full run, the same one the hourly job makes |
 | `node scripts/job-pull.mjs --no-ai` | Only pulls and lists roles; no Claude calls. New roles keep the Status `New`, so the next full run writes (and pays for) a resume for each one. A company's first pull still lands as `Backlog`, even with `--no-ai`. With text or email on, a run that adds roles sends "Job search: N new roles added." (that includes a first pull's `Backlog` roles) |
 | `node scripts/job-pull.mjs --no-ai --backlog` | Pulls and lists every new role as `Backlog`: no resumes, no messages, no Claude calls. Set a role's Status to `New` to get a resume for it |
+| `node scripts/set-status.mjs "acme search" Applied` | Changes one role's Status in the job list, found by its link or by words from its company and title |
 | `node scripts/install-schedule.mjs` | Turns the hourly job on or off to match `schedule.hourly` in your settings |
 | `node --test` | The automatic tests |
 | `node evals/run-checker.mjs` | The live fact-checker evals (about $1.30) |

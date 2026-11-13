@@ -17,10 +17,10 @@ The environment variable `AJS_SETTINGS` points the scripts at a different settin
 
 | Setting | What it does |
 |---|---|
-| `search.companies` | The job boards to check, each as `{ "name": "Acme", "ats": "greenhouse", "slug": "acme" }`. `ats` is the kind of board (`greenhouse`, `lever`, `ashby`, `ashby-page`, `gem` or `workday`) and `slug` is the board's name in its web address. [Add one with find-board](#add-a-company). Required: at least one. |
+| `search.companies` | The job boards to check, each as `{ "name": "Acme", "ats": "greenhouse", "slug": "acme" }`. `ats` is the kind of board (`greenhouse`, `lever`, `ashby`, `ashby-page`, `gem` or `workday`) and `slug` is the board's name in its web address. [Add one with find-board](#add-a-company). An entry can also carry `"titles": ["product marketing"]` to keep only that company's roles whose title contains one of those words, on top of `titleKeywords`. Required: at least one. |
 | `search.titleKeywords` | Words a job title must contain, in any case. A title matching any one is kept. Required. |
 | `search.titleExclude` | Words that rule a title out, matched as whole words. `[]` excludes nothing. |
-| `search.locationKeywords` | Places you'd work, matched against the job's location, such as `"remote"` or `"chicago"`. `[]` means anywhere. Required. |
+| `search.locationKeywords` | Places you'd work, matched against the job's location, such as `"remote"` or `"chicago"`. `[]` means anywhere. A role whose description offers remote work (for example "fully remote or hybrid") also passes, and is shown with "Remote" added to its location, unless the description rules remote out. Required. |
 | `search.usOnly` | `true` (the default) drops roles in other countries, unless the location also names the US. |
 | `search.pay` | The pay floor, as `{ "minTop": 0, "minBaseTop": 0 }`. Required; see [the pay rule](#the-pay-rule). |
 | `search.families` | Kinds of role, each as `{ "name": "Product Manager", "titleKeywords": ["product manager"] }`. See [families](#role-families). |
@@ -139,4 +139,4 @@ Each resume goes once per version, so a rerun never repeats it, but a re-tailore
 
 ## The job list
 
-`data/jobs.csv` has one row per role, newest first. Edit it in a text editor, not in Numbers (Numbers saves a separate `.numbers` copy instead of the CSV). The Status column is how you and the pipeline talk: `New` waits for a resume; the code sets `Resume ready`, `Could not tailor` or `Needs review`; `Backlog` is a role that was already open when its company's board was first read, or one found by a `--backlog` run. You set `Applied`, `Recruiter screen`, `Rejected` or `Skip`. Setting a held role back to `New` retries it.
+`data/jobs.csv` has one row per role, newest first. Edit it in a text editor, not in Numbers (Numbers saves a separate `.numbers` copy instead of the CSV). The Status column is how you and the pipeline talk: `New` waits for a resume; the code sets `Resume ready`, `Could not tailor` or `Needs review`; `Backlog` is a role that was already open when its company's board was first read, or one found by a `--backlog` run. You set `Applied`, `Recruiter screen`, `Rejected` or `Skip`. Setting a held role back to `New` retries it. To change a Status without opening the file, run `node scripts/set-status.mjs "<link, or words from the company and title>" Applied`; the words must match exactly one role.

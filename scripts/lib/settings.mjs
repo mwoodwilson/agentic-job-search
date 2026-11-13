@@ -71,6 +71,7 @@ export function validateSettings(s, { profileText = "", profileMissing = false }
       if (!ATS_TYPES.includes(c.ats)) add(`${at}.ats is ${JSON.stringify(c.ats ?? null)}, which isn't a job board type this tool can read. Use one of: ${ATS_TYPES.join(", ")}.`);
       if (blank(c.slug)) add(`${at}.slug is blank: it comes from the company's careers page address.`);
       if (c.facets !== undefined && !isObj(c.facets)) add(`${at}.facets should be an object, or left out.`);
+      if (c.titles !== undefined && !(Array.isArray(c.titles) && c.titles.length && c.titles.every((t) => !blank(t)))) add(`${at}.titles should be a list of title words, such as ["product marketing"], or left out.`);
     });
   }
   if (!Array.isArray(search.titleKeywords) || search.titleKeywords.length === 0) {
