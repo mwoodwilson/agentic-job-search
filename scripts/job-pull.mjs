@@ -6,14 +6,15 @@
 //     hosted pages, Gem and Workday). Keeps roles not seen before that pass the title, location and pay rules.
 //  2. Logs them: data/jobs.csv (Status "New", or "Backlog" on a company's first pull: those roles were already open,
 //     so they don't all get paid resumes at once) and each role family's archive in archives/ (full job descriptions).
-//  3. Reads inbox.md (import-jobs), then, if text or email is on, sends one line about the new roles (with the Numbers
-//     job list when that is on).
+//  3. Reads inbox.md (import-jobs), so its roles are counted and get resumes this run.
 //  4. Writes up to 3 resumes at once: per "New" role the writer + checker loop (lib/tailor-loop.mjs, each role in its
 //     own draft file), which ends in "Resume ready", "Could not tailor" or "Needs review" (set by code). Each resume
 //     that passes is filed in outputs/tailored-resumes.md, built as Word/PDF and sent right away in its own text and
 //     email, where those are on (each once per version: data/sent-log.json). If Claude isn't answering (not signed in,
 //     a usage limit, no network), the roles stay "New" for the next run and no more Claude steps start this run.
-//  5. After the messages: the Numbers job list (if on) gets the final statuses; update-competencies runs once a day;
+//  5. Then, if text or email is on, one line counting the new roles ("3 new jobs added: 1 resume created, 2 could not
+//     tailor.") with the Numbers job list, already showing the final statuses, when that is on.
+//  6. After the messages: the Numbers job list (if on) gets the final statuses; update-competencies runs once a day;
 //     the repair and scout agents write proposals to data/proposals/. Every run ends with a log line and a snapshot in
 //     .history/. Claude steps (lib/claude.mjs) are capped and read-only except one named file each.
 // Flags: --no-ai (pull only; new roles stay "New" for the next full run), --backlog (add every new role as "Backlog",
@@ -601,13 +602,14 @@ async function claudeStepAsync(step, prompt, writes = [], opts = {}) {
 }
 
 
-// The only messages you get, by text and by email (each only if turned on in the settings): right after the pull, one
-// line about the new roles, with the job list (the Numbers sheet, when that is on); then each resume, the moment it
-// passes, in its own text (its line and job link, then its PDF) and its own email. Problems are never messaged; they
-// go to data/workflow-log.md.
-function rolesMessage(newRoles, { sheet = false } = {}) {
+// The only messages you get, by text and by email (each only if turned on in the settings): each resume, the moment
+// it passes, in its own text (its line and job link, then its PDF) and its own email; then, once the resumes are
+// done, one line counting the new roles and what became of them, with the job list (the Numbers sheet, when that is
+// on). Problems are never messaged; they go to data/workflow-log.md. Roles held for review aren't counted in the line.
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+function rolesMessage(newRoles, { built = 0, couldNot = 0, backlog = 0, sheet = false } = {}) {
   if (!newRoles) return null;
-  const line = `Job search: ${newRoles} new role${newRoles === 1 ? "" : "s"} added.`;
+  const line = `${plural(newRoles, "new job")} added: ${plural(built, "resume")} created, ${couldNot} could not tailor${backlog ? `, ${backlog} in Backlog` : ""}.`;
   return sheet ? `${line} The job list is attached.` : line;
 }
 // The job link goes on its own line: Messages cuts off a long PDF file name.
@@ -860,10 +862,10 @@ const LIVE_IO = { sendIMessage, sendEmail, logEvent };
 // The run's messages. Each goes only where its notification is turned on (targets, from notifyTargets); with
 // everything off nothing is sent and no files are copied. Nothing else is ever sent.
 
-// Right after the pull: one line about the new roles, by text and by email, with the job list when the Numbers sheet
-// is on. If the sheet is on but didn't update (numbersOk false), nothing is sent: the roles are in jobs.csv and the
-// next sheet. Returns true when something went out.
-async function notifyNews({ targets, newRoles, numbersOk, io = LIVE_IO, stageDir = STAGE_DIR, sheetFile = NUMBERS_FILE }) {
+// After the resumes: one line counting the new roles (resumes created, could not tailor, in Backlog), by text and by
+// email, with the job list when the Numbers sheet is on. If the sheet is on but didn't update (numbersOk false),
+// nothing is sent: the roles are in jobs.csv and the next sheet. Returns true when something went out.
+async function notifyNews({ targets, newRoles, counts = {}, numbersOk, io = LIVE_IO, stageDir = STAGE_DIR, sheetFile = NUMBERS_FILE }) {
   if (!newRoles || !(targets.imessage || targets.email) || (targets.numbers && !numbersOk)) return false;
   let sheet = null;
   if (targets.numbers) {
@@ -871,7 +873,7 @@ async function notifyNews({ targets, newRoles, numbersOk, io = LIVE_IO, stageDir
     sheet = join(stageDir, basename(sheetFile));
     await writeFile(sheet, await readFile(sheetFile));
   }
-  const text = rolesMessage(newRoles, { sheet: !!sheet });
+  const text = rolesMessage(newRoles, { ...counts, sheet: !!sheet });
   let sent = false;
   if (targets.imessage) {
     if (io.sendIMessage(targets.imessage, text, sheet ? [sheet] : [])) { sent = true; console.log(`iMessage: "${text}" sent to ${targets.imessage}`); }
@@ -1196,17 +1198,19 @@ async function addToArchives(jobs, stamp) {
   for (const { name: family } of settings.search.families) {
     const file = archiveFile(family);
     const text = await readFile(file, "utf8").catch(() => "");
-    archives[family] = { file, text, roles: new Set() };
-    for (const m of text.matchAll(/^## (.+?) \| (.+)$/gm)) archives[family].roles.add(`${m[2]}|${m[1]}`.toLowerCase());
+    archives[family] = { file, text, roles: new Map() };
+    // Each heading's link, so a same-title posting with a different requisition ID is still archived: the writer
+    // needs its own description.
+    for (const m of text.matchAll(/^## (.+?) \| (.+)$[\s\S]*?\*\*Link:\*\* (\S+)/gm)) addKeyLink(archives[family].roles, `${m[2]}|${m[1]}`.toLowerCase(), m[3]);
   }
   const roleKey = (j) => `${j.company}|${j.title}`.toLowerCase();
   const addByFamily = {};
   for (const j of jobs) {
     const family = archiveFor(j.title);
     const a = archives[family];
-    if (!j.url || allLinks.has(j.url) || a.roles.has(roleKey(j))) continue;
+    if (!j.url || allLinks.has(j.url) || isListedRepost(a.roles, roleKey(j), j.url)) continue;
     allLinks.add(j.url);
-    a.roles.add(roleKey(j));
+    addKeyLink(a.roles, roleKey(j), j.url);
     (addByFamily[family] ??= []).push(j);
   }
 
@@ -1506,23 +1510,26 @@ async function main() {
   const inbox = noAi ? { imported: [], grew: [] } : await readInbox(seen, today, stamp);
   const newRoles = kept.length + inbox.imported.length;
 
-  // 1. One line about the new roles, right away (with the job list when the Numbers sheet is on).
-  // 2. Resumes, up to 3 at once, each sent the moment it passes. Sends go one at a time, the new-roles line first; the
-  //    writers start while the sheet is being updated and sent.
-  const newsSent = newRoles && (TARGETS.imessage || TARGETS.email)
-    ? oneAtATime(async () => notifyNews({ targets: TARGETS, newRoles, numbersOk: TARGETS.numbers ? await syncNumbers() : false }))
-      .catch((e) => logEvent("failure", `The new-roles message stopped: ${e.message}`))
-    : null;
-  const result = noAi ? null : tailorAll();
-  await newsSent;
-  const done = (await result) || { review: [], built: 0, sent: 0, couldNot: 0 };
+  // 1. Resumes, up to 3 at once, each sent the moment it passes.
+  // 2. Then one line counting the new roles and what became of them: "3 new jobs added: 1 resume created, 2 could not
+  //    tailor." (with the job list when the Numbers sheet is on, already showing the final statuses).
+  const done = (noAi ? null : await tailorAll()) || { review: [], built: 0, sent: 0, couldNot: 0 };
+  let sheetSynced = false;
+  if (newRoles && (TARGETS.imessage || TARGETS.email)) {
+    const counts = { built: done.built, couldNot: done.couldNot, backlog: firstBacklog };
+    await oneAtATime(async () => {
+      const numbersOk = TARGETS.numbers ? (sheetSynced = await syncNumbers()) : false;
+      return notifyNews({ targets: TARGETS, newRoles, counts, numbersOk });
+    }).catch((e) => logEvent("failure", `The new-roles message stopped: ${e.message}`));
+  }
 
   // 3. A run with nothing new texts "no matching roles were found", only when everyRun is on.
   if (!newRoles && !done.built) notifyNothing({ targets: TARGETS });
 
-  // 4. After the messages: the Numbers copy of jobs.csv (only when it's turned on) gets the final statuses, then the
-  //    slower upkeep: competencies (once a day), board repairs, and the scout when it is due.
-  if (TARGETS.numbers) await syncNumbers();
+  // 4. After the messages: the Numbers copy of jobs.csv (only when it's turned on, and not already synced for the
+  //    message) gets the final statuses, then the slower upkeep: competencies (once a day), board repairs, and the
+  //    scout when it is due.
+  if (TARGETS.numbers && !sheetSynced) await syncNumbers();
   await competenciesOnceADay([...new Set([...grew, ...inbox.grew])], { run: !noAi });
   if (plan.repairBoards) repairBoards();
   if (!noAi) scoutIfDue();

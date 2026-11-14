@@ -1,5 +1,5 @@
-// The run is built to be fast: boards are pulled side by side, the new-roles line goes out right after the pull, up to
-// 3 resumes are written at once and each is sent the moment it passes, and the slower upkeep waits until after.
+// The run is built to be fast: boards are pulled side by side, up to 3 resumes are written at once and each is sent
+// the moment it passes, the new-roles line (with the counts) follows, and the slower upkeep waits until after.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, mkdtempSync } from "node:fs";
@@ -34,10 +34,10 @@ test("one board that throws is reported without stopping the others", async () =
   assert.deepEqual(lines, ["✗ Broken: the site answered with error 500", "✓ Fine: 0 match (of 2 open)"]);
 });
 
-test("the new-roles line is queued before the writers start, and the run waits for both", () => {
-  assert.ok(at("readInbox(") < at("notifyNews("), "the inbox's roles count as new roles");
-  assert.ok(at("notifyNews(") < at("tailorAll()"), "queued first, so it goes out before any resume");
-  assert.ok(at("tailorAll()") < at("await newsSent;"));
+test("the new-roles line waits for the resumes, so it can count them", () => {
+  assert.ok(at("readInbox(") < at("await tailorAll()"), "the inbox's roles are tailored this run");
+  assert.ok(at("await tailorAll()") < at("notifyNews("), "the line goes out after the resumes");
+  assert.match(main, /const counts = \{ built: done\.built, couldNot: done\.couldNot, backlog: firstBacklog \};/);
 });
 
 test("competencies, board repairs and the scout run after the messages", () => {

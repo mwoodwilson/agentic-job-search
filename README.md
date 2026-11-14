@@ -7,10 +7,10 @@ An hourly job-search pipeline for Mac and Claude Code. It watches the job boards
 ## What it does
 
 1. Every hour it reads the public job boards of the companies you choose, all at once, and keeps the new roles that match your titles, places and pay.
-2. It adds them to a job list (and, if you like, a Numbers sheet), saves each full job description, and, if you turned text or email on, tells you right away how many roles were added.
+2. It adds them to a job list (and, if you like, a Numbers sheet) and saves each full job description.
 3. A writer agent drafts a one-page resume for each role, up to 3 at a time, using only the facts in your own files.
 4. Code checks five of the six hard rules. A separate fact-checker agent must then back every line with a quote from your files, and code confirms each quote is really there (hard rule 5). After up to three tries, a resume that still fails is held for you.
-5. Each resume that passes becomes Word and PDF files and is sent the moment it's ready, in its own text and email with the job link. Text, email and Numbers notifications are all off until you turn them on. A run with one new role takes a few minutes.
+5. Each resume that passes becomes Word and PDF files and is sent the moment it's ready, in its own text and email with the job link. Then one line sums up the run, such as "3 new jobs added: 1 resume created, 2 could not tailor.", with the job list. Text, email and Numbers notifications are all off until you turn them on. A run with one new role takes a few minutes.
 
 ## How it works
 
@@ -20,7 +20,6 @@ flowchart TD
     filters --> dedup["Already listed?<br/>same link, or same company + title<br/>(different requisition IDs = new role)"]
     dedup -->|"new"| list["Job list and archives"]
     inbox["Optional inbox<br/>roles you or an agent add"] --> dedup
-    list -.->|"if on"| sheet["Notifications<br/>new-roles line, Numbers sheet"]
     list --> writer["Writer agent<br/>up to 3 roles at once"]
     writer -->|"under 70% true<br/>keyword match"| could["Could not tailor<br/>nothing is stretched"]
     writer --> checks
@@ -34,6 +33,8 @@ flowchart TD
     checks -->|"all pass"| ready["Resume ready<br/>Word + PDF, one page"]
     checks -->|"fails after 3 tries"| review["Needs review<br/>held for you, with reasons"]
     ready -->|"if on"| send["Notifications<br/>resume and job link, right away"]
+    send -.->|"after the resumes, if on"| sheet["Notifications<br/>new jobs, resumes created, could not tailor<br/>+ Numbers sheet"]
+    could -.->|"counted"| sheet
 
     classDef agent fill:#dbeafe,stroke:#2563eb,color:#111
     classDef plain fill:#f3f4f6,stroke:#6b7280,color:#111
@@ -75,7 +76,7 @@ Read next: [Setup](docs/SETUP.md), [Architecture](docs/ARCHITECTURE.md), [Custom
 - **Limited file access and dollar caps.** Every Claude step runs by itself. It can read files only inside the project folder and write only the one or two files it is named for, and it can't run shell commands. Only the repair agent (which can also open web pages) and the scout (which can also search the web and open pages) reach the internet. Each step has a dollar cap and a 20-minute time limit, and the writer can write only its own role's draft, never another resume.
 - **Evals that grow from real failures.** The fact-checker is tested on a true resume and on copies with one planted problem each: a changed number, inflated ownership, work moved to the wrong role, a summary that is a list of keywords. Every real failure becomes a new case before it is fixed. How it works and what each case caught: [docs/EVALS.md](docs/EVALS.md).
 - **Nothing is sent twice.** A log of what was sent, kept per resume version, means a rerun or a crash never sends the same resume twice, while a changed resume does go out again. Only one run happens at a time, and every run is saved to a local history you can undo.
-- **Tests.** 462 automatic tests (`node --test`) cover the checks, the writer loop, the messages and the settings. They use only the made-up example person and make no Claude calls.
+- **Tests.** 463 automatic tests (`node --test`) cover the checks, the writer loop, the messages and the settings. They use only the made-up example person and make no Claude calls.
 
 ## Quick start
 
@@ -101,7 +102,7 @@ Everyday commands:
 |---|---|
 | `node scripts/check-setup.mjs` | Checks Node, Claude Code, your settings and your profile, and names anything still open |
 | `node scripts/job-pull.mjs` | One full run, the same one the hourly job makes |
-| `node scripts/job-pull.mjs --no-ai` | Only pulls and lists roles; no Claude calls. New roles keep the Status `New`, so the next full run writes (and pays for) a resume for each one. A company's first pull still lands as `Backlog`, even with `--no-ai`. With text or email on, a run that adds roles sends "Job search: N new roles added." (that includes a first pull's `Backlog` roles) |
+| `node scripts/job-pull.mjs --no-ai` | Only pulls and lists roles; no Claude calls. New roles keep the Status `New`, so the next full run writes (and pays for) a resume for each one. A company's first pull still lands as `Backlog`, even with `--no-ai`. With text or email on, a run that adds roles sends "N new jobs added: 0 resumes created, 0 could not tailor." (with ", N in Backlog" for a first pull's `Backlog` roles) |
 | `node scripts/job-pull.mjs --no-ai --backlog` | Pulls and lists every new role as `Backlog`: no resumes, no messages, no Claude calls. Set a role's Status to `New` to get a resume for it |
 | `node scripts/set-status.mjs "acme search" Applied` | Changes one role's Status in the job list, found by its link or by words from its company and title |
 | `node scripts/install-schedule.mjs` | Turns the hourly job on or off to match `schedule.hourly` in your settings |

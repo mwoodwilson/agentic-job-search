@@ -1,6 +1,6 @@
 // What the run sends (text and email): the job list (Numbers), finished resumes, and fixed lines. Nothing else.
-// Right after the pull, one line about the new roles (with the job list when the sheet is on); then each resume, the
-// moment it passes, in its own text (its line and job link, then the PDF) and its own email.
+// Each resume, the moment it passes, in its own text (its line and job link, then the PDF) and its own email; then,
+// once the resumes are done, one line counting the new roles (with the job list when the sheet is on).
 // Everything is off until it is turned on in the settings (notifications). Problems (failed steps, broken boards,
 // scout and repair proposals) go to workflow-log.md only.
 // These tests never send a message, open an app or touch iCloud: sending is stubbed or the function is pure.
@@ -49,10 +49,16 @@ test("an address that is filled in but turned off is not used; turned on with no
 
 // ---- the lines ----
 
-test("the new-roles line, with and without the job list", () => {
-  assert.equal(rolesMessage(3, { sheet: true }), "Job search: 3 new roles added. The job list is attached.");
-  assert.equal(rolesMessage(1), "Job search: 1 new role added.");
+test("the new-roles line counts what became of them, with and without the job list", () => {
+  assert.equal(rolesMessage(3, { built: 1, couldNot: 2, sheet: true }), "3 new jobs added: 1 resume created, 2 could not tailor. The job list is attached.");
+  assert.equal(rolesMessage(1, { built: 0, couldNot: 1 }), "1 new job added: 0 resumes created, 1 could not tailor.");
+  assert.equal(rolesMessage(2, { built: 2 }), "2 new jobs added: 2 resumes created, 0 could not tailor.");
   assert.equal(rolesMessage(0, { sheet: true }), null, "no new roles: no line");
+});
+
+test("a company's first pull is named in the line, so roles with no resume don't look lost", () => {
+  assert.equal(rolesMessage(5, { backlog: 5 }), "5 new jobs added: 0 resumes created, 0 could not tailor, 5 in Backlog.");
+  assert.equal(rolesMessage(6, { built: 1, backlog: 5 }), "6 new jobs added: 1 resume created, 0 could not tailor, 5 in Backlog.");
 });
 
 test("each resume's line names the role and gives its job link (Messages cuts off long file names)", () => {
@@ -144,10 +150,10 @@ test("a resume is never sent twice on the same channel (the same version)", asyn
 
 test("iMessage and Numbers, new roles: the line with the job list attached", async () => {
   const w = world();
-  assert.equal(await notifyNews({ targets: { ...off, imessage: PHONE, numbers: true }, newRoles: 3, numbersOk: true, ...newsOpts(w.opts) }), true);
+  assert.equal(await notifyNews({ targets: { ...off, imessage: PHONE, numbers: true }, newRoles: 3, counts: { built: 1, couldNot: 2 }, numbersOk: true, ...newsOpts(w.opts) }), true);
   assert.equal(w.calls.texts.length, 1);
   const [t] = w.calls.texts;
-  assert.equal(t.text, "Job search: 3 new roles added. The job list is attached.");
+  assert.equal(t.text, "3 new jobs added: 1 resume created, 2 could not tailor. The job list is attached.");
   assert.deepEqual(t.files, [join(w.opts.stageDir, "Agentic Job Search.numbers")]);
   assert.equal(readFileSync(t.files[0], "utf8"), "sheet");
 });
@@ -164,18 +170,18 @@ test("Numbers on but the sheet didn't update: the new-roles line isn't sent, but
 
 test("email only, new roles: one email with the fixed line and no attachment", async () => {
   const w = world();
-  await notifyNews({ targets: { ...off, email: EMAIL }, newRoles: 3, numbersOk: false, ...newsOpts(w.opts) });
+  await notifyNews({ targets: { ...off, email: EMAIL }, newRoles: 3, counts: { built: 3 }, numbersOk: false, ...newsOpts(w.opts) });
   assert.deepEqual(w.calls.texts, []);
-  assert.deepEqual(w.calls.emails, [{ to: EMAIL, subject: "Job search", body: "Job search: 3 new roles added.", files: [] }]);
+  assert.deepEqual(w.calls.emails, [{ to: EMAIL, subject: "Job search", body: "3 new jobs added: 3 resumes created, 0 could not tailor.", files: [] }]);
 });
 
-test("email and Numbers: the line with the sheet, then one email per resume as each passes", async () => {
+test("email and Numbers: one email per resume as each passes, then the line with the sheet", async () => {
   const w = world();
   const targets = { ...off, email: EMAIL, numbers: true };
-  await notifyNews({ targets, newRoles: 2, numbersOk: true, ...newsOpts(w.opts) });
   for (const doc of w.docs) await notifyResume({ targets, doc, ...resumeOpts(w.opts) });
-  const [summary, ...each] = w.calls.emails;
-  assert.equal(summary.body, "Job search: 2 new roles added. The job list is attached.");
+  await notifyNews({ targets, newRoles: 2, counts: { built: 2 }, numbersOk: true, ...newsOpts(w.opts) });
+  const summary = w.calls.emails.at(-1), each = w.calls.emails.slice(0, -1);
+  assert.equal(summary.body, "2 new jobs added: 2 resumes created, 0 could not tailor. The job list is attached.");
   assert.deepEqual(summary.files, [join(w.opts.stageDir, "Agentic Job Search.numbers")]);
   assert.deepEqual(each.map((e) => e.subject), ["Resume: Role One, Acme", "Resume: Role Two, Acme"]);
   assert.deepEqual(each.map((e) => e.files.map(base)), [["Resume One.pdf"], ["Resume Two.pdf"]]);
