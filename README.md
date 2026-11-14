@@ -76,7 +76,7 @@ Read next: [Setup](docs/SETUP.md), [Architecture](docs/ARCHITECTURE.md), [Custom
 - **Limited file access and dollar caps.** Every Claude step runs by itself. It can read files only inside the project folder and write only the one or two files it is named for, and it can't run shell commands. Only the repair agent (which can also open web pages) and the scout (which can also search the web and open pages) reach the internet. Each step has a dollar cap and a 20-minute time limit, and the writer can write only its own role's draft, never another resume.
 - **Evals that grow from real failures.** The fact-checker is tested on a true resume and on copies with one planted problem each: a changed number, inflated ownership, work moved to the wrong role, a summary that is a list of keywords. Every real failure becomes a new case before it is fixed. How it works and what each case caught: [docs/EVALS.md](docs/EVALS.md).
 - **Nothing is sent twice.** A log of what was sent, kept per resume version, means a rerun or a crash never sends the same resume twice, while a changed resume does go out again. Only one run happens at a time, and every run is saved to a local history you can undo.
-- **Tests.** 463 automatic tests (`node --test`) cover the checks, the writer loop, the messages and the settings. They use only the made-up example person and make no Claude calls.
+- **Tests.** 469 automatic tests (`node --test`) cover the checks, the writer loop, the messages and the settings. They use only the made-up example person and make no Claude calls.
 
 ## Quick start
 
@@ -85,7 +85,13 @@ You need a Mac, Claude Code installed and signed in, and Node 20 or newer. It wa
 Sign in by running `claude` and using `/login` (with a Claude plan, or a Console account to pay by API usage). The login is kept in your Mac's keychain, where the hourly job can use it. An `ANTHROPIC_API_KEY` set only in your shell, for example in `~/.zshrc`, works when you run the pull yourself but isn't seen by the hourly job, which doesn't read your shell's startup files.
 
 1. Get the code with `git clone https://github.com/mwoodwilson/agentic-job-search.git`, open a terminal in its folder (`cd agentic-job-search`) and start Claude Code there with `claude`.
-2. Type `/setup`, or paste this message into Claude Code: *Help me set up this project. Use its setup skill and walk me through it one question at a time.* It asks one question at a time: it drafts your profile from your resume (`profile/profile.md` and `profile/stories.md` are living documents: keep adding true detail and every resume gets better), finds each company's job board, sets your rules and notifications, runs a first pull without Claude and offers to turn on the hourly schedule. Prefer to do it by hand? [docs/SETUP.md](docs/SETUP.md) has the same eight steps.
+2. Type `/setup`, or paste this message into Claude Code: *Help me set up this project. Use its setup skill and walk me through it one question at a time.* It tells you the cost first, then asks about eight questions, one at a time:
+   - your experience: paste a resume, or just tell it about your jobs in your own words, no resume needed (`profile/profile.md` and `profile/stories.md` are living documents: keep adding true detail and every resume gets better)
+   - the roles you want, where, and your pay floor
+   - the companies to watch (it finds each one's job board)
+   - texts or email, the weekly scout and the hourly schedule
+
+   Then it writes your first resumes (up to 3 roles you pick) and offers interview practice. Prefer to do it by hand? [docs/SETUP.md](docs/SETUP.md) has the same eight steps.
 3. After that, new roles get resumes when the hourly job runs, or whenever you run `node scripts/job-pull.mjs`. Finished resumes are in `outputs/resumes/` and the job list is `data/jobs.csv`. Edit the job list in a text editor, not in Numbers: Numbers saves a separate `.numbers` copy, so a change made there never reaches the pipeline.
 
 ### New to Claude Code or the terminal?

@@ -14,7 +14,7 @@ import tempfile
 from pathlib import Path
 from xml.sax.saxutils import escape as esc
 
-TESTS = 463   # from `node --test`
+TESTS = 469   # from `node --test`
 EVALS = 5     # the fact-checker cases in evals/
 
 OUT = Path(__file__).resolve().parent

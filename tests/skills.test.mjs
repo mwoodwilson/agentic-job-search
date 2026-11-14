@@ -217,16 +217,71 @@ test("setup never puts a web-derived address inside double quotes, and uses only
 });
 
 test("setup turns the hourly schedule and the weekly scout on only with a clear yes", () => {
-  const step8 = skillText("setup").split(/^## Step 8:/m)[1].split(/^## Finish/m)[0];
-  assert.match(step8, /`schedule\.hourly` to true only on a clear yes/);
-  assert.match(step8, /if you are not sure[^.\n]*leave it (off|false)/i);
-  assert.match(step8, /`schedule\.scout\.enabled` to true only on a clear yes/);
+  const step7 = skillText("setup").split(/^## Step 7:/m)[1].split(/^## Step 8:/m)[0];
+  assert.match(step7, /`schedule\.hourly` to true only on a clear yes/);
+  assert.match(step7, /if you are not sure[^.\n]*leave it (off|false)/i);
+  assert.match(step7, /`schedule\.scout\.enabled` to true only on a clear yes/);
 });
 
 test("the scripts the setup skill runs exist", () => {
   const named = [...new Set([...skillText("setup").matchAll(/node scripts\/([\w-]+)\.mjs/g)].map((m) => m[1]))];
-  assert.deepEqual(named.sort(), ["check-setup", "find-board", "install-schedule", "job-pull"]);
+  assert.deepEqual(named.sort(), ["check-setup", "find-board", "install-schedule", "job-pull", "set-status"]);
   for (const n of named) assert.ok(existsSync(join(P.ROOT, "scripts", `${n}.mjs`)), `scripts/${n}.mjs`);
+});
+
+// ---------- onboarding: the owner's design (2026-11-13). Change it only when the owner asks. ----------
+// Simple: eight steps, about eight questions. Cost first. Experience from a resume or in the user's own words. Roles,
+// where and pay, companies, notifications, scout and schedule, then the first resumes, then interview practice.
+
+const setupStep = (n) => skillText("setup").split(new RegExp(`^## Step ${n}:`, "m"))[1].split(/^## /m)[0];
+
+test("onboarding: the eight steps, in this order", () => {
+  const steps = [...skillText("setup").matchAll(/^## Step \d+: (.+)$/gm)].map((m) => m[1]);
+  assert.deepEqual(steps, ["Cost and the computer", "Your experience", "The roles you want", "Where and pay", "Companies to watch", "Notifications", "Scout and schedule", "Your first resumes"]);
+  assert.match(skillText("setup"), /eight steps, about eight questions\. Don't add questions\./);
+});
+
+test("onboarding: cost is the first thing said, and every paid step names its cost before it runs", () => {
+  const step1 = setupStep(1);
+  assert.ok(step1.indexOf("Before anything else, tell the user what it costs") < step1.indexOf("check-setup"), "cost before anything runs");
+  assert.match(step1, /about \$2–4 of Claude usage/);
+  assert.match(step1, /an hour with no new roles costs nothing/);
+  assert.match(step1, /stops at \$3/);
+  assert.match(setupStep(7), /about \$5 a run/, "the scout's cost");
+  assert.match(setupStep(8), /Each is about \$2–4/, "the first resumes' cost");
+  assert.match(skillText("setup").split(/^## Finish/m)[1], /uses about as much as any conversation that long/, "interview practice's cost");
+});
+
+test("onboarding: experience comes from a resume or the user's own words, and no resume is needed", () => {
+  const step2 = setupStep(2);
+  assert.match(step2, /or just tell me about your jobs in your own words\. Rough is fine, and you don't need a resume\./);
+  assert.match(step2, /\*\*Without a resume\*\*, interview them one job at a time/);
+  assert.match(step2, /in their own words, in `profile\/stories\.md`/, "raw words are kept as a source");
+  assert.match(step2, /What's something you're proud of that your resume undersells\?/, "raw experience is asked for even with a resume");
+  assert.match(step2, /the writer builds every resume only from these two files/);
+});
+
+test("onboarding: each kind of role gets its own resume folder", () => {
+  assert.match(setupStep(3), /one `search\.families` entry per kind of role[\s\S]*own folder of resumes in `outputs\/resumes\/`/);
+});
+
+test("onboarding: it ends by writing the first resumes, then offers interview practice", () => {
+  const step8 = setupStep(8);
+  assert.ok(step8.indexOf("--no-ai --backlog") < step8.indexOf("Pick up to 3 for resumes now"));
+  assert.ok(step8.indexOf("Pick up to 3 for resumes now") < step8.indexOf("node scripts/job-pull.mjs --resume-only"));
+  const finish = skillText("setup").split(/^## Finish/m)[1];
+  assert.match(finish, /Want to practice interviewing for one of these roles\?/);
+  assert.match(finish, /run the interview-prep skill/);
+  assert.match(finish, /`\/interview-prep`/);
+});
+
+test("onboarding: the questions cut for simplicity stay cut", () => {
+  const text = skillText("setup");
+  assert.match(text, /Leave `search\.titleExclude` as `\[\]`/);
+  assert.match(text, /set both `minTop` and `minBaseTop` to it/);
+  assert.match(text, /Leave `notifications\.imessage\.everyRun` off/);
+  assert.doesNotMatch(text, /^## Step \d+: Resume rules/m, "no resume-rules step");
+  assert.doesNotMatch(text, /Do you have your current resume\?/, "a resume is never required");
 });
 
 // ---------- the research-resume-rules skill and its prompt ----------
